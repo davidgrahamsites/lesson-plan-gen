@@ -1,5 +1,3 @@
-import mammoth from 'mammoth';
-import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
 
 export const MindMapParser = (content: string) => {
@@ -37,38 +35,62 @@ export const GamesListParser = (content: string) => {
 };
 
 export const CalendarTableParser = (ocrText: string) => {
-    // User describes:
-    // Row 1: Days/Subject
-    // Row 2: General Content + Game Name
-
-    const lines = ocrText.split('\n').filter(l => l.trim().length > 3);
+    const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
     const calendarData: Record<string, { subject: string, content: string, game: string }> = {};
-
-    // OCR usually outputs text in a way that rows are sequential or columns are sequential.
-    // We'll look for Day keywords (Monday, etc.) to segment.
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-    // Simple heuristic: If we find a line with a day name, assume it's part of the header.
-    // This is a difficult problem without LLM-based layout detection, 
-    // but we'll try a flexible keyword search.
-
-    days.forEach(day => {
-        const dayIndex = lines.findIndex(l => l.toLowerCase().includes(day));
-        if (dayIndex !== -1) {
-            // Heuristic: Subject is often on the same line or next line
-            const subject = lines[dayIndex].replace(new RegExp(day, 'i'), '').trim() || lines[dayIndex + 1] || "";
-
-            // Row 2 logic: Search for content/games in subsequent lines until next day
-            // For now, we'll take the next available non-empty lines
-            const row2Text = lines.slice(dayIndex + 2, dayIndex + 5).join(' ');
-
-            calendarData[day] = {
-                subject,
-                content: row2Text, // This will be used to match Mind Map targets
-                game: row2Text     // This will be parsed for Game Names
-            };
-        }
+    // Find a line that looks like a header (contains multiple day names)
+    const headerLineIndex = lines.findIndex(line => {
+        const lowerLine = line.toLowerCase();
+        return days.filter(d => lowerLine.includes(d)).length >= 2;
     });
+
+    if (headerLineIndex !== -1) {
+        // COLUMN-BASED TABLE detected
+        const headerLine = lines[headerLineIndex];
+        const contentLine = lines[headerLineIndex + 1] || "";
+        const lowerHeader = headerLine.toLowerCase();
+
+        days.forEach(day => {
+            const start = lowerHeader.indexOf(day);
+            if (start !== -1) {
+                // Find where the next day starts to segment the header and content
+                const otherDayStarts = days
+                    .map(d => lowerHeader.indexOf(d))
+                    .filter(idx => idx > start)
+                    .sort((a, b) => a - b);
+
+                const end = otherDayStarts[0] || headerLine.length;
+
+                // Segment the header (subject) and content
+                const subject = headerLine.slice(start, end).replace(new RegExp(day, 'i'), '').trim();
+
+                // Map the content line relative to the header positions
+                // This is a rough heuristic but better than before
+                const content = contentLine.slice(start, end).trim();
+
+                calendarData[day] = {
+                    subject: subject || "No Subject",
+                    content: content || "No Content",
+                    game: content // Game name is usually in the content
+                };
+            }
+        });
+    } else {
+        // ROW-BASED or messy OCR
+        days.forEach(day => {
+            const dayIndex = lines.findIndex(l => l.toLowerCase().includes(day));
+            if (dayIndex !== -1) {
+                const subject = lines[dayIndex].replace(new RegExp(day, 'i'), '').trim() || lines[dayIndex + 1] || "General";
+                const row2Text = lines.slice(dayIndex + 1, dayIndex + 4).join(' ');
+                calendarData[day] = {
+                    subject,
+                    content: row2Text,
+                    game: row2Text
+                };
+            }
+        });
+    }
 
     return calendarData;
 };

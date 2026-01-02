@@ -42,6 +42,8 @@ export const AISynthesizer = async (
             })
         });
         const data = await response.json();
+        if (data.error) throw new Error(`OpenAI Error: ${data.error.message}`);
+        if (!data.choices?.[0]) throw new Error("OpenAI returned an empty response.");
         return data.choices[0].message.content;
     } else {
         // Gemini implementation
@@ -53,6 +55,8 @@ export const AISynthesizer = async (
             })
         });
         const data = await response.json();
+        if (data.error) throw new Error(`Gemini Error: ${data.error.message}`);
+        if (!data.candidates?.[0]) throw new Error("Gemini returned an empty response. This might be due to safety filters.");
         return data.candidates[0].content.parts[0].text;
     }
 };
