@@ -130,12 +130,33 @@ export const GetSpiralReviewItems = (list: string[], currentIndex: number) => {
 
 export const TemplateProcessor = async (arrayBuffer: ArrayBuffer | null, data: Record<string, string>) => {
     if (!arrayBuffer) throw new Error("Template buffer is missing.");
-    if (arrayBuffer.byteLength < 100) throw new Error(`Template file is too small (${arrayBuffer.byteLength} bytes). It might be corrupted.`);
+
+    // Check if it's a ZIP/DOCX by looking for 'PK' header (50 4B)
+    const view = new Uint8Array(arrayBuffer);
+    const isZip = view[0] === 0x50 && view[1] === 0x4B;
+
+    if (!isZip) {
+        // Fallback for TXT templates
+        try {
+            const decoder = new TextDecoder();
+            let text = decoder.decode(arrayBuffer);
+            Object.entries(data).forEach(([key, value]) => {
+                const placeholder = `{{${key}}}`;
+                text = text.replaceAll(placeholder, value);
+            });
+            return {
+                blob: new Blob([text], { type: 'text/plain' }),
+                extension: 'txt'
+            };
+        } catch (e) {
+            throw new Error("Template is not a valid DOCX or Text file.");
+        }
+    }
 
     try {
         const zip = await JSZip.loadAsync(arrayBuffer);
         const docXmlFile = zip.file("word/document.xml");
-        if (!docXmlFile) throw new Error("Invalid DOCX: missing word/document.xml");
+        if (!docXmlFile) throw new Error("Invalid DOCX: missing word/document.xml. Please ensure this is a standard .docx file and not a .doc or renamed file.");
 
         const docXml = await docXmlFile.async("string");
         let newXml = docXml;
@@ -146,10 +167,13 @@ export const TemplateProcessor = async (arrayBuffer: ArrayBuffer | null, data: R
 
         zip.file("word/document.xml", newXml);
         const blob = await zip.generateAsync({ type: "blob" });
-        return blob;
+        return {
+            blob,
+            extension: 'docx'
+        };
     } catch (error) {
-        console.error("JSZip Error:", error);
-        throw new Error(`Failed to process template: ${error instanceof Error ? error.message : 'Invalid DOCX format'}`);
+        console.error("Template Processing Error:", error);
+        throw new Error(`Failed to process template: ${error instanceof Error ? error.message : 'Invalid format'}`);
     }
 };
 

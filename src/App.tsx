@@ -266,7 +266,7 @@ const App: React.FC = () => {
       const review = GetSpiralReviewItems(files.spiralReview, spiralIndex);
       setSpiralIndex(review.nextIndex);
 
-      const finalDoc = await TemplateProcessor(files.template, {
+      const result = await TemplateProcessor(files.template, {
         'DAY': targetDay.toUpperCase(),
         'SUBJECT': dayData.subject,
         'TARGETS': targets,
@@ -275,7 +275,7 @@ const App: React.FC = () => {
         'REVIEW_RECENT': review.recent || "No recent review available"
       });
 
-      saveAs(finalDoc, `Lesson_Plan_${targetDay}.docx`);
+      saveAs(result.blob, `Lesson_Plan_${targetDay}.${result.extension}`);
 
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
