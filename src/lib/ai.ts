@@ -68,6 +68,7 @@ export const AdvancedLessonPlanSynthesizer = async (
         gameName: string;
         gameDescription: string;
         spiralReview: { oldest: string; recent: string };
+        song: string;
         teacherName: string;
         className: string;
     },
@@ -85,6 +86,7 @@ export const AdvancedLessonPlanSynthesizer = async (
     Game Description (LITERAL): ${context.gameDescription}
     Spiral Review (Oldest): ${context.spiralReview.oldest}
     Spiral Review (Recent): ${context.spiralReview.recent}
+    Song of the Week: ${context.song}
     Teacher: ${context.teacherName}
     Class: ${context.className}
 
@@ -92,19 +94,18 @@ export const AdvancedLessonPlanSynthesizer = async (
     1. EXTREME BREVITY. This is for a busy teacher. No long paragraphs.
     2. SECTION LIMITS:
        - Objectives: Max 2 short bullet points.
-       - Introduction: Max 2 short sentences.
+       - Introduction: STRICT FORMAT: "Sing [Song Name] -> Review: [Oldest Sentence] / [Recent Sentence]". NO other text.
        - Activity: Max 3 short steps.
        - Game: Paste the Name and a brief 1-2 sentence version of the description.
        - Closure: Max 1 sentence.
     3. NO BOLDING. NO Meta-commentary. NO "For this game...". NO "AI" narrating.
-    4. INTRODUCTION: Briefly incorporate the two spiral review items.
     
     OUTPUT FORMAT (JSON ONLY):
     {
       "activityName": "WEEK X [DAY] - [SUBJECT]",
       "objectives": "Concise list.",
       "materials": "Concise list.",
-      "introduction": "Very short intro.",
+      "introduction": "Sing ${context.song} -> Review: ...",
       "activity": "Short activity steps.",
       "game": "LITERAL Name\\nBrief adapted description.",
       "closure": "Short closing."

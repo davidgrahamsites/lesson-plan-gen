@@ -41,7 +41,7 @@ interface Message {
 
 interface FileState {
   mindMap: { data: Record<string, string>, date: string } | null;
-  calendar: Record<string, { subject: string, content: string, game: string }> | null;
+  calendar: { data: Record<string, { subject: string, content: string, game: string }>, song: string } | null;
   gamesList: Record<string, string> | null;
   spiralReview: string[] | null;
   template: ArrayBuffer | null;
@@ -96,6 +96,14 @@ const App: React.FC = () => {
           savedFiles.mindMap = {
             data: savedFiles.mindMap,
             date: '' // Default or empty if we can't re-parse easily without the file
+          };
+        }
+        // Migration: Check if calendar is in old format (direct object vs {data, song})
+        if (savedFiles.calendar && !savedFiles.calendar.data) {
+          console.log("Migrating legacy Calendar state...");
+          savedFiles.calendar = {
+            data: savedFiles.calendar,
+            song: "Song of the Week" // Default
           };
         }
         setFiles(savedFiles);
@@ -203,7 +211,8 @@ const App: React.FC = () => {
         setFiles(prev => ({ ...prev, spiralReview: SpiralReviewParser(text) }));
       } else if (type === 'calendar') {
         const text = await OCRProcessor(file);
-        setFiles(prev => ({ ...prev, calendar: CalendarTableParser(text) }));
+        const parsed = CalendarTableParser(text);
+        setFiles(prev => ({ ...prev, calendar: parsed }));
       }
 
       setMessages(prev => [...prev, {
@@ -246,7 +255,7 @@ const App: React.FC = () => {
     }
 
     const targetDay = query.toLowerCase().match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/)?.[0] || 'monday';
-    const dayData = files.calendar[targetDay];
+    const dayData = files.calendar.data[targetDay];
 
     if (!dayData) {
       setMessages(prev => [...prev, {
@@ -296,6 +305,7 @@ const App: React.FC = () => {
           gameName: gameMatch || dayData.game,
           gameDescription: genericDesc,
           spiralReview: { oldest: review.oldest || 'N/A', recent: review.recent || 'N/A' },
+          song: files.calendar.song,
           teacherName: config.teacherName,
           className: config.className
         },

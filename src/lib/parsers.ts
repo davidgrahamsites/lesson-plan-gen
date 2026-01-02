@@ -41,6 +41,14 @@ export const CalendarTableParser = (ocrText: string) => {
     const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
     const calendarData: Record<string, { subject: string, content: string, game: string }> = {};
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    let extractedSong = "Song of the Week"; // Default
+
+    // Heuristic: Look for "Song" or "Sing" in the FIRST 5 lines (usually header info)
+    const songLine = lines.slice(0, 10).find(l => l.toLowerCase().includes('song') || l.toLowerCase().includes('sing'));
+    if (songLine) {
+        // Clean up: remove "Song:" prefix if present
+        extractedSong = songLine.replace(/song\s*:?/i, '').replace(/sing\s*:?/i, '').trim() || songLine;
+    }
 
     // Find a line that looks like a header (contains multiple day names)
     const headerLineIndex = lines.findIndex(line => {
@@ -95,7 +103,7 @@ export const CalendarTableParser = (ocrText: string) => {
         });
     }
 
-    return calendarData;
+    return { data: calendarData, song: extractedSong };
 };
 
 export const SpiralReviewParser = (content: string) => {
