@@ -128,22 +128,28 @@ export const GetSpiralReviewItems = (list: string[], currentIndex: number) => {
     };
 };
 
-export const TemplateProcessor = async (arrayBuffer: ArrayBuffer, data: Record<string, string>) => {
-    // Simple template replacement for DOCX using a ZIP/XML approach
-    // In a real app, libraries like docxtemplater are better, 
-    // but we'll implement a clean version using JSZip for direct control.
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    const docXml = await zip.file("word/document.xml")?.async("string");
+export const TemplateProcessor = async (arrayBuffer: ArrayBuffer | null, data: Record<string, string>) => {
+    if (!arrayBuffer) throw new Error("Template buffer is missing.");
+    if (arrayBuffer.byteLength < 100) throw new Error(`Template file is too small (${arrayBuffer.byteLength} bytes). It might be corrupted.`);
 
-    if (!docXml) throw new Error("Invalid DOCX: missing document.xml");
+    try {
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const docXmlFile = zip.file("word/document.xml");
+        if (!docXmlFile) throw new Error("Invalid DOCX: missing word/document.xml");
 
-    let newXml = docXml;
-    Object.entries(data).forEach(([key, value]) => {
-        const placeholder = `{{${key}}}`;
-        newXml = newXml.replaceAll(placeholder, value);
-    });
+        const docXml = await docXmlFile.async("string");
+        let newXml = docXml;
+        Object.entries(data).forEach(([key, value]) => {
+            const placeholder = `{{${key}}}`;
+            newXml = newXml.replaceAll(placeholder, value);
+        });
 
-    zip.file("word/document.xml", newXml);
-    const blob = await zip.generateAsync({ type: "blob" });
-    return blob;
+        zip.file("word/document.xml", newXml);
+        const blob = await zip.generateAsync({ type: "blob" });
+        return blob;
+    } catch (error) {
+        console.error("JSZip Error:", error);
+        throw new Error(`Failed to process template: ${error instanceof Error ? error.message : 'Invalid DOCX format'}`);
+    }
 };
+
