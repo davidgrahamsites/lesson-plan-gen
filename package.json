@@ -11,11 +11,17 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "docx": "^9.5.1",
+    "file-saver": "^2.0.5",
     "framer-motion": "^12.23.26",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
+    "mammoth": "^1.11.0",
+    "pdfjs-dist": "^5.4.530",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
