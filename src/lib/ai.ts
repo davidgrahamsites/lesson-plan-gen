@@ -76,7 +76,7 @@ export const AdvancedLessonPlanSynthesizer = async (
     apiKey: string
 ) => {
     const prompt = `
-    You are an expert curriculum designer for ESL. Generate a professional lesson plan.
+    You are a strict data formatter for a lesson plan. You are NOT a creative writer.
     
     CONTEXT:
     Day: ${context.day}
@@ -90,25 +90,24 @@ export const AdvancedLessonPlanSynthesizer = async (
     Teacher: ${context.teacherName}
     Class: ${context.className}
 
-    STRICT RULES FOR BREVITY:
-    1. EXTREME BREVITY. This is for a busy teacher. No long paragraphs.
-    2. SECTION LIMITS:
-       - Objectives: Max 2 short bullet points.
-       - Introduction: STRICT FORMAT: "Sing [Song Name] -> Review: [Oldest Sentence] / [Recent Sentence]". NO other text.
-       - Activity: Max 3 short steps.
-       - Game: Paste the Name and a brief 1-2 sentence version of the description.
-       - Closure: Max 1 sentence.
-    3. NO BOLDING. NO Meta-commentary. NO "For this game...". NO "AI" narrating.
+    CRITICAL RULES - READ CAREFULLY:
+    1. EXTREME LITERALISM. If a specific activity (like "Weather", "Calendar", "Greeting") is not in the source text, DO NOT INCLUDE IT.
+    2. ABSOLUTELY NO "FILLER". Do not add "Discuss the weather", "Sing a goodbye song", "Clean up", or "Take attendance".
+    3. INTRODUCTION FORMAT: STRICTLY: "Sing ${context.song} -> Review: ${context.spiralReview.oldest} / ${context.spiralReview.recent}". 
+       - IF THE SONG IS "Song of the Week" (default), just say "Sing Song -> Review...".
+       - DO NOT ADD ANYTHING ELSE TO INTRODUCTION.
+    4. GAME SECTION: Paste the Literal Game Name and Description. Do not summarize.
+    5. CLOSURE: Max 1 sentence reflecting on the Learning Targets.
     
     OUTPUT FORMAT (JSON ONLY):
     {
       "activityName": "WEEK X [DAY] - [SUBJECT]",
-      "objectives": "Concise list.",
-      "materials": "Concise list.",
-      "introduction": "Sing ${context.song} -> Review: ...",
-      "activity": "Short activity steps.",
-      "game": "LITERAL Name\\nBrief adapted description.",
-      "closure": "Short closing."
+      "objectives": "Concise list based ONLY on Learning Targets.",
+      "materials": "Concise list based ONLY on Game/Activity.",
+      "introduction": "Sing ${context.song} -> Review: ${context.spiralReview.oldest} / ${context.spiralReview.recent}",
+      "activity": "Max 3 short steps based ONLY on Learning Targets.",
+      "game": "LITERAL Name\\nLITERAL Description",
+      "closure": "Short review of targets."
     }
   `;
 
