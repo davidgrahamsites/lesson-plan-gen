@@ -24,3 +24,17 @@ export const clearAppState = async (key: string) => {
         console.error(`Failed to clear ${key} from IndexedDB:`, err);
     }
 };
+
+export const listSets = async () => {
+    try {
+        const all = await get('all_sets_metadata') || [];
+        return all as string[];
+    } catch (err) {
+        console.error(`Failed to list sets from IndexedDB:`, err);
+        return [];
+    }
+};
+
+export const saveSetMetadata = async (names: string[]) => {
+    await set('all_sets_metadata', names);
+};

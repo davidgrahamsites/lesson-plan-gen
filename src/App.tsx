@@ -17,7 +17,8 @@ import { twMerge } from 'tailwind-merge';
 import { MindMapParser, GamesListParser, TemplateProcessor, CalendarTableParser, SpiralReviewParser, GetSpiralReviewItems } from './lib/parsers';
 import { AISynthesizer, OCRProcessor } from './lib/ai';
 import { saveAs } from 'file-saver';
-import { saveAppState, loadAppState } from './lib/storage';
+import { saveAppState, loadAppState, listSets, saveSetMetadata } from './lib/storage';
+import { Layers, Save, FolderOpen } from 'lucide-react';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -65,6 +66,10 @@ const App: React.FC = () => {
   });
 
   const [spiralIndex, setSpiralIndex] = useState(0);
+  const [savedSetNames, setSavedSetNames] = useState<string[]>([]);
+  const [activeSetName, setActiveSetName] = useState<string>('Default');
+  const [setNameInput, setSetNameInput] = useState('');
+  const [showSetsModal, setShowSetsModal] = useState(false);
 
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -84,6 +89,9 @@ const App: React.FC = () => {
 
       const savedMessages = await loadAppState('app_messages');
       if (savedMessages) setMessages(savedMessages);
+
+      const sets = await listSets();
+      setSavedSetNames(sets);
 
       isHydrated.current = true;
     };
@@ -116,6 +124,47 @@ const App: React.FC = () => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const handleSaveSet = async () => {
+    if (!setNameInput.trim()) return;
+    const name = setNameInput.trim();
+
+    // Save current data bundle
+    const bundle = { files, spiralIndex, messages };
+    await saveAppState(`docset_DATA_${name}`, bundle);
+
+    const newSets = Array.from(new Set([...savedSetNames, name]));
+    setSavedSetNames(newSets);
+    await saveSetMetadata(newSets);
+    setActiveSetName(name);
+    setSetNameInput('');
+    setShowSetsModal(false);
+
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      text: `Document set "${name}" saved successfully.`,
+      sender: 'system',
+      timestamp: new Date()
+    }]);
+  };
+
+  const handleLoadSet = async (name: string) => {
+    const bundle = await loadAppState(`docset_DATA_${name}`);
+    if (bundle) {
+      setFiles(bundle.files);
+      setSpiralIndex(bundle.spiralIndex);
+      setMessages(bundle.messages);
+      setActiveSetName(name);
+      setShowSetsModal(false);
+
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        text: `Switched to document set: ${name}`,
+        sender: 'system',
+        timestamp: new Date()
+      }]);
+    }
+  };
 
   const handleFileUpload = async (type: keyof FileState, file: File) => {
     try {
@@ -324,6 +373,17 @@ const App: React.FC = () => {
             <Settings className="w-5 h-5" />
             <span className="hidden lg:block font-medium">Settings</span>
           </button>
+
+          <button
+            onClick={() => setShowSetsModal(true)}
+            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-white/5 text-white/60 transition-all group"
+          >
+            <Layers className="w-5 h-5 group-hover:text-primary transition-colors" />
+            <div className="hidden lg:block text-left flex-1">
+              <span className="font-medium">Doc Sets</span>
+              <p className="text-[10px] text-white/20 truncate">{activeSetName}</p>
+            </div>
+          </button>
         </nav>
 
         <div className="mt-auto p-4 glass-card lg:block hidden">
@@ -469,6 +529,79 @@ const App: React.FC = () => {
                 </div>
               </div>
               <button onClick={() => setConfigOpen(false)} className="w-full btn-primary mt-4">Save Configuration</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSetsModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md glass-card p-8 space-y-6"
+            >
+              <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                <h2 className="text-xl font-bold">Document Sets</h2>
+                <button onClick={() => setShowSetsModal(false)} className="text-white/40 hover:text-white text-2xl">&times;</button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Save Current Group As</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={setNameInput}
+                      onChange={(e) => setSetNameInput(e.target.value)}
+                      placeholder="e.g. January 2026"
+                      className="flex-1 glass-input text-white text-sm"
+                    />
+                    <button
+                      onClick={handleSaveSet}
+                      className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white hover:opacity-90 active:scale-95 transition-all"
+                    >
+                      <Save className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-white/40 uppercase tracking-wider">Loaded Sets</label>
+                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2 scrollbar-thin">
+                    {savedSetNames.map(name => (
+                      <button
+                        key={name}
+                        onClick={() => handleLoadSet(name)}
+                        className={cn(
+                          "w-full flex items-center justify-between p-3 rounded-xl border transition-all",
+                          activeSetName === name
+                            ? "bg-primary/20 border-primary/40 text-white"
+                            : "bg-white/5 border-white/10 text-white/60 hover:bg-white/10"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <FolderOpen className={cn("w-4 h-4", activeSetName === name ? "text-primary" : "text-white/20")} />
+                          <span className="text-sm font-medium">{name}</span>
+                        </div>
+                        {activeSetName === name && (
+                          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                        )}
+                      </button>
+                    ))}
+                    {savedSetNames.length === 0 && (
+                      <p className="text-center py-4 text-xs text-white/20 italic">No saved sets found.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
