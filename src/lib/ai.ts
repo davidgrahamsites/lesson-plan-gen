@@ -102,7 +102,7 @@ export const AdvancedLessonPlanSynthesizer = async (
     OUTPUT FORMAT (JSON ONLY):
     {
       "activityName": "WEEK X [DAY] - [SUBJECT]",
-      "objectives": "Concise list based ONLY on Learning Targets.",
+      "objectives": "LITERAL List of Learning Targets. COPY EXACTLY.",
       "materials": "Concise list based ONLY on Game/Activity.",
       "introduction": "Sing ${context.song} -> Review: ${context.spiralReview.oldest} / ${context.spiralReview.recent}",
       "activity": "Max 3 short steps based ONLY on Learning Targets.",

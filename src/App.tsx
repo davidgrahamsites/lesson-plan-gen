@@ -41,7 +41,7 @@ interface Message {
 
 interface FileState {
   mindMap: { data: Record<string, string>, date: string } | null;
-  calendar: { data: Record<string, { subject: string, content: string, game: string }>, song: string } | null;
+  calendar: { data: Record<string, { subject: string, content: string, game: string }>, song: string, week?: string } | null;
   gamesList: Record<string, string> | null;
   spiralReview: string[] | null;
   template: ArrayBuffer | null;
@@ -103,7 +103,8 @@ const App: React.FC = () => {
           console.log("Migrating legacy Calendar state...");
           savedFiles.calendar = {
             data: savedFiles.calendar,
-            song: "Song of the Week" // Default
+            song: "Song of the Week",
+            week: ""
           };
         }
         setFiles(savedFiles);
@@ -269,32 +270,44 @@ const App: React.FC = () => {
 
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
-      text: `Generating: ${targetDay.toUpperCase()} - ${dayData.subject}...`,
+      text: `Generating: ${files.calendar.week ? files.calendar.week + ' ' : ''}${targetDay.toUpperCase()} - ${dayData.subject}...`,
       sender: 'ai',
       timestamp: new Date()
     }]);
 
     try {
-      // 1. Get targets: Mapping Content from Row 2 of Calendar to Mind Map keys
-      // The content from the calendar is used to look up the mind map.
-      // We'll search the mind map for keys containing the 'content' string.
-      const mindMapMatch = Object.entries(files.mindMap.data).find(([key, _]) =>
-        key.includes(targetDay) || key.includes(dayData.content.toLowerCase().slice(0, 10))
-      );
+      // 1. Get targets: Use Week info if available + Day to find exact match
+      // If week is known (e.g. "WEEK 3"), prioritize keys starting with that.
+      const currentWeekLabel = files.calendar.week?.toLowerCase() || "";
+
+      const mindMapMatch = Object.entries(files.mindMap.data).find(([key, _]) => {
+        const lowerKey = key.toLowerCase();
+        // Strict Week Match: If we have a week, key MUST match it.
+        if (currentWeekLabel && !lowerKey.includes(currentWeekLabel)) return false;
+        return lowerKey.includes(targetDay);
+      });
+
+      // Fallback: If strict match fails, try relaxing (e.g. content match) - but be careful.
+      // For now, let's stick to the found match or a generic fallback.
       const targets = mindMapMatch?.[1] || "Learning targets for " + dayData.content;
 
       // 2. Identify the Game from Games List
-      const gameMatch = Object.keys(files.gamesList).find(name =>
-        dayData.game.toLowerCase().includes(name.toLowerCase())
-      );
+      // Robust Match: text might be messy "Practice Week Week 3 Circle the Answer..."
+      // We check if any CLEAN game name exists inside the messy text.
+      const messyGameText = dayData.game.toLowerCase();
+      const gameMatch = Object.keys(files.gamesList).find(name => {
+        // Check if the clean name (e.g. "circle the answer") is inside the messy text
+        return messyGameText.includes(name.toLowerCase());
+      });
+
+      const cleanGameName = gameMatch || dayData.game; // Use clean name if found, else messy
       const genericDesc = gameMatch ? files.gamesList[gameMatch] : "Educational game for [topic]";
 
       // 3. Get Spiral Review Sentences
       const review = GetSpiralReviewItems(files.spiralReview, spiralIndex);
       setSpiralIndex(review.nextIndex);
 
-      const weekMatch = mindMapMatch?.[0].match(/week\s*\d+/i);
-      const weekLabel = weekMatch ? weekMatch[0].toUpperCase() : "WEEK";
+      const weekLabel = files.calendar.week || (mindMapMatch?.[0].match(/week\s*\d+/i)?.[0].toUpperCase() || "WEEK");
 
       // 4. Advanced AI Synthesis
       const synthData = await AdvancedLessonPlanSynthesizer(
@@ -302,7 +315,7 @@ const App: React.FC = () => {
           day: targetDay.toUpperCase(),
           subject: dayData.subject,
           targets: targets,
-          gameName: gameMatch || dayData.game,
+          gameName: cleanGameName,
           gameDescription: genericDesc,
           spiralReview: { oldest: review.oldest || 'N/A', recent: review.recent || 'N/A' },
           song: files.calendar.song,
