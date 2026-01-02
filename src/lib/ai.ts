@@ -65,7 +65,8 @@ export const AdvancedLessonPlanSynthesizer = async (
         day: string;
         subject: string;
         targets: string;
-        genericGame: string;
+        gameName: string;
+        gameDescription: string;
         spiralReview: { oldest: string; recent: string };
         teacherName: string;
         className: string;
@@ -80,34 +81,38 @@ export const AdvancedLessonPlanSynthesizer = async (
     Day: ${context.day}
     Subject: ${context.subject}
     Learning Targets: ${context.targets}
-    Game Description (from list): ${context.genericGame}
+    Game Name: ${context.gameName}
+    Game Description (LITERAL): ${context.gameDescription}
     Spiral Review (Oldest): ${context.spiralReview.oldest}
     Spiral Review (Recent): ${context.spiralReview.recent}
     Teacher: ${context.teacherName}
     Class: ${context.className}
 
     STRICT FORMATTING RULES:
-    1. NO BOLDING. Do not use asterisks (**) or any markdown bolding anywhere.
-    2. NO META-COMMENTARY. Do not include phrases like "Adapt the game to...", "Based on...", or "Here is the plan...".
-    3. NO "AI" LANGUAGE. Write as a human teacher would.
-    4. NO BULLET POINTS with ".,". Ensure sentences end with single periods.
-    5. GAME SECTION: Use the provided 'Game Description' text. INTEGRATE the 'Learning Targets' into the game description seamlessly so it reads as a single, cohesive activity. Do not append notes about adaptation.
-    6. INTRODUCTION SECTION: Include the spiral review items naturally within the intro flow.
-    7. STYLE: Professional, concise, and clean.
+    1. NO BOLDING. Do not use asterisks (**) or any markdown bolding.
+    2. NO META-COMMENTARY. Do not include phrases like "Adapt the game to...", "For this game...", "Based on...", or "Here is the plan...".
+    3. NO "AI" SUMMARIES. Do not rewrite or shorten the game description.
+    4. NO BULLET POINTS with ".,".
+    
+    SECTION SPECIFIC RULES:
+    - GAME SECTION: You MUST output the literal 'Game Name' followed by the literal 'Game Description' provided. Do not summarize it. Do not adapt it with AI notes. Just paste it.
+    - INTRODUCTION SECTION: Include the spiral review items naturally within the intro flow. Use the literal spiral review text.
+    - OBJECTIVES: Use the literal Learning Targets to form 1-3 specific objectives.
+    - STYLE: Professional, concise, and clean.
 
     OUTPUT FORMAT:
-    You must return a valid JSON object strictly following this structure:
+    Return a valid JSON object:
     {
       "activityName": "e.g., WEEK 2 THURSDAY - PHONICS",
-      "objectives": "List of 1-3 specific objectives.",
+      "objectives": "List of 1-3 objectives.",
       "materials": "List of materials needed.",
-      "introduction": "Intro steps (5 mins) incorporating the spiral review sentences.",
+      "introduction": "Intro steps (5 mins) including the spiral review.",
       "activity": "Step-by-step teaching activity (8 mins).",
-      "game": "The game description with learning targets integrated (8 mins).",
+      "game": "LITERAL Game Name\\nLITERAL Game Description",
       "closure": "Wrap-up (4 mins) with review and praise."
     }
 
-    Respond ONLY with the JSON object. No extra text.
+    Respond ONLY with the JSON object.
   `;
 
     const getResponse = async (p: string) => {

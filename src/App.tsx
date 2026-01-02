@@ -282,7 +282,8 @@ const App: React.FC = () => {
           day: targetDay.toUpperCase(),
           subject: dayData.subject,
           targets: targets,
-          genericGame: genericDesc,
+          gameName: gameMatch || dayData.game,
+          gameDescription: genericDesc,
           spiralReview: { oldest: review.oldest || 'N/A', recent: review.recent || 'N/A' },
           teacherName: config.teacherName,
           className: config.className
@@ -305,6 +306,12 @@ const App: React.FC = () => {
         'Activity': synthData.activity,
         'Game': synthData.game,
         'Closure': synthData.closure,
+
+        // Dashed versions (as seen in user's list)
+        '-Introductions': synthData.introduction,
+        '-Activity': synthData.activity,
+        '-Game': synthData.game,
+        '-Closure': synthData.closure,
 
         // Uppercase keys (traditional)
         'ACTIVITY_NAME': synthData.activityName,
