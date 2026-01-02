@@ -73,6 +73,39 @@ export const CalendarTableParser = (ocrText: string) => {
     return calendarData;
 };
 
+export const SpiralReviewParser = (content: string) => {
+    // Parser for the Spiral Review list. 
+    // Bottom of the list is oldest, top is newest.
+    const lines = content.split('\n').filter(line => line.trim() !== '');
+    return lines; // Just return the array of sentences
+};
+
+/**
+ * Selection Algorithm: 
+ * - Increments from bottom (oldest) to top.
+ * - Spaced repetition pulls more frequently from top.
+ */
+export const GetSpiralReviewItems = (list: string[], currentIndex: number) => {
+    if (list.length === 0) return { sentence: "No review items available.", nextIndex: 0 };
+
+    // Requirement: Increment from bottom to top (oldest to newest)
+    // Let's assume 'currentIndex' tracks the progress from the bottom (index list.length - 1 down to 0)
+    const bottomIndex = list.length - 1 - (currentIndex % list.length);
+    const oldestSentence = list[bottomIndex];
+
+    // Requirement: Pull MORE frequently from top (newest)
+    // We'll also pick a "recent" sentence (from the top 20% of the list)
+    const topCount = Math.ceil(list.length * 0.2);
+    const recentIndex = Math.floor(Math.random() * topCount);
+    const recentSentence = list[recentIndex];
+
+    return {
+        oldest: oldestSentence,
+        recent: recentSentence,
+        nextIndex: currentIndex + 1
+    };
+};
+
 export const TemplateProcessor = async (arrayBuffer: ArrayBuffer, data: Record<string, string>) => {
     // Simple template replacement for DOCX using a ZIP/XML approach
     // In a real app, libraries like docxtemplater are better, 

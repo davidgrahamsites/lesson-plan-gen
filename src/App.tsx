@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { MindMapParser, GamesListParser, TemplateProcessor, CalendarTableParser } from './lib/parsers';
+import { MindMapParser, GamesListParser, TemplateProcessor, CalendarTableParser, SpiralReviewParser, GetSpiralReviewItems } from './lib/parsers';
 import { AISynthesizer, OCRProcessor } from './lib/ai';
 import { saveAs } from 'file-saver';
 
@@ -33,6 +33,7 @@ interface FileState {
   mindMap: Record<string, string> | null;
   calendar: Record<string, { subject: string, content: string, game: string }> | null;
   gamesList: Record<string, string> | null;
+  spiralReview: string[] | null;
   template: ArrayBuffer | null;
 }
 
@@ -53,6 +54,7 @@ const App: React.FC = () => {
     mindMap: null,
     calendar: null,
     gamesList: null,
+    spiralReview: null,
     template: null
   });
 
@@ -60,6 +62,8 @@ const App: React.FC = () => {
     provider: 'openai' as 'openai' | 'gemini',
     apiKey: ''
   });
+
+  const [spiralIndex, setSpiralIndex] = useState(0);
 
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -81,6 +85,9 @@ const App: React.FC = () => {
       } else if (type === 'gamesList') {
         const text = await file.text();
         setFiles(prev => ({ ...prev, gamesList: GamesListParser(text) }));
+      } else if (type === 'spiralReview') {
+        const text = await file.text();
+        setFiles(prev => ({ ...prev, spiralReview: SpiralReviewParser(text) }));
       } else if (type === 'calendar') {
         const text = await OCRProcessor(file);
         setFiles(prev => ({ ...prev, calendar: CalendarTableParser(text) }));
@@ -104,10 +111,10 @@ const App: React.FC = () => {
   };
 
   const generateLessonPlan = async (query: string) => {
-    if (!files.mindMap || !files.gamesList || !files.template || !files.calendar) {
+    if (!files.mindMap || !files.gamesList || !files.template || !files.calendar || !files.spiralReview) {
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
-        text: "Please upload all required files (Mind Map, Calendar, Games List, and Template) before generating.",
+        text: "Please upload all required files (Mind Map, Calendar, Games List, Spiral Review, and Template) before generating.",
         sender: 'system',
         timestamp: new Date()
       }]);
@@ -163,11 +170,17 @@ const App: React.FC = () => {
 
       const finalGameDesc = await AISynthesizer(genericDesc, targets, config.provider, config.apiKey);
 
+      // 3. Get Spiral Review Sentences
+      const review = GetSpiralReviewItems(files.spiralReview, spiralIndex);
+      setSpiralIndex(review.nextIndex);
+
       const finalDoc = await TemplateProcessor(files.template, {
         'DAY': targetDay.toUpperCase(),
         'SUBJECT': dayData.subject,
         'TARGETS': targets,
-        'GAME_DESCRIPTION': finalGameDesc
+        'GAME_DESCRIPTION': finalGameDesc,
+        'REVIEW_OLDEST': review.oldest || "No oldest review available",
+        'REVIEW_RECENT': review.recent || "No recent review available"
       });
 
       saveAs(finalDoc, `Lesson_Plan_${targetDay}.docx`);
@@ -298,6 +311,12 @@ const App: React.FC = () => {
             label="Games List"
             status={files.gamesList ? 'Loaded' : 'Empty'}
             onUpload={(f) => handleFileUpload('gamesList', f)}
+          />
+          <FileSlot
+            icon={<Sparkles className="w-4 h-4" />}
+            label="Spiral Review"
+            status={files.spiralReview ? 'Loaded' : 'Empty'}
+            onUpload={(f) => handleFileUpload('spiralReview', f)}
           />
           <FileSlot
             icon={<Upload className="w-4 h-4" />}
