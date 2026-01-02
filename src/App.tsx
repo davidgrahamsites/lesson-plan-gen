@@ -325,16 +325,16 @@ const App: React.FC = () => {
 
       const displayFilename = `PK2_${weekLabel.replace(/\s+/g, '_')}_${targetDay.toUpperCase()}_Lesson_Plan`;
 
-      // 6. Construct Preview Text (Full version)
-      const previewText = `### ${synthData.activityName}\n\n` +
-        `**Class:** ${config.className} | **Teacher:** ${config.teacherName}\n` +
-        `**Objectives:**\n${synthData.objectives}\n\n` +
-        `**Materials:**\n${synthData.materials}\n\n` +
-        `**Process:**\n` +
-        `**Introduction:** ${synthData.introduction}\n\n` +
-        `**Activity:** ${synthData.activity}\n\n` +
-        `**Game:** ${synthData.game}\n\n` +
-        `**Closure:** ${synthData.closure}`;
+      // 6. Construct Preview Text (Full version) - NO BOLDING
+      const previewText = `${synthData.activityName}\n\n` +
+        `Class: ${config.className} | Teacher: ${config.teacherName}\n` +
+        `Objectives:\n${synthData.objectives}\n\n` +
+        `Materials:\n${synthData.materials}\n\n` +
+        `Process:\n` +
+        `Introduction: ${synthData.introduction}\n\n` +
+        `Activity: ${synthData.activity}\n\n` +
+        `Game: ${synthData.game}\n\n` +
+        `Closure: ${synthData.closure}`;
 
       setMessages(prev => [...prev, {
         id: Date.now().toString(),

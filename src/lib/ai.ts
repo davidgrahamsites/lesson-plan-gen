@@ -74,35 +74,40 @@ export const AdvancedLessonPlanSynthesizer = async (
     apiKey: string
 ) => {
     const prompt = `
-    You are an expert curriculum designer. Based on the context below, generate a detailed lesson plan session.
+    You are an expert curriculum designer. Based on the context below, generate a professional, detailed lesson plan.
     
     CONTEXT:
     Day: ${context.day}
     Subject: ${context.subject}
     Learning Targets: ${context.targets}
-    Generic Game Base: ${context.genericGame}
+    Game Description (from list): ${context.genericGame}
     Spiral Review (Oldest): ${context.spiralReview.oldest}
     Spiral Review (Recent): ${context.spiralReview.recent}
     Teacher: ${context.teacherName}
     Class: ${context.className}
 
-    TASK:
-    Populate a structured lesson plan. Ensure it stays 100% true to the Learning Targets and Subject provided.
-    The game section MUST be an adaptation of the 'Generic Game Base' provided, tailored to the specific' Learning Targets'.
+    STRICT FORMATTING RULES:
+    1. NO BOLDING. Do not use asterisks (**) or any markdown bolding anywhere.
+    2. NO META-COMMENTARY. Do not include phrases like "Adapt the game to...", "Based on...", or "Here is the plan...".
+    3. NO "AI" LANGUAGE. Write as a human teacher would.
+    4. NO BULLET POINTS with ".,". Ensure sentences end with single periods.
+    5. GAME SECTION: Use the provided 'Game Description' text. INTEGRATE the 'Learning Targets' into the game description seamlessly so it reads as a single, cohesive activity. Do not append notes about adaptation.
+    6. INTRODUCTION SECTION: Include the spiral review items naturally within the intro flow.
+    7. STYLE: Professional, concise, and clean.
 
     OUTPUT FORMAT:
     You must return a valid JSON object strictly following this structure:
     {
-      "activityName": "e.g., WEEK 2 MONDAY - PHONICS /x/",
-      "objectives": "Bulleted list of 1-3 specific objectives starting with action verbs.",
-      "materials": "Bulleted list of materials needed.",
-      "introduction": "Short intro (5 mins) including the sentence review using BOTH spiral review items.",
+      "activityName": "e.g., WEEK 2 THURSDAY - PHONICS",
+      "objectives": "List of 1-3 specific objectives.",
+      "materials": "List of materials needed.",
+      "introduction": "Intro steps (5 mins) incorporating the spiral review sentences.",
       "activity": "Step-by-step teaching activity (8 mins).",
-      "game": "The adapted game description (8 mins) based on the generic game base.",
-      "closure": "Quick wrap-up (4 mins) with review and praise."
+      "game": "The game description with learning targets integrated (8 mins).",
+      "closure": "Wrap-up (4 mins) with review and praise."
     }
 
-    Respond ONLY with the JSON object. Do not include markdown formatting or extra text.
+    Respond ONLY with the JSON object. No extra text.
   `;
 
     const getResponse = async (p: string) => {
