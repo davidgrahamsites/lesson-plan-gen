@@ -40,7 +40,7 @@ interface Message {
 }
 
 interface FileState {
-  mindMap: Record<string, string> | null;
+  mindMap: { data: Record<string, string>, date: string } | null;
   calendar: Record<string, { subject: string, content: string, game: string }> | null;
   gamesList: Record<string, string> | null;
   spiralReview: string[] | null;
@@ -89,7 +89,17 @@ const App: React.FC = () => {
   useEffect(() => {
     const initPersistence = async () => {
       const savedFiles = await loadAppState('app_files');
-      if (savedFiles) setFiles(savedFiles);
+      if (savedFiles) {
+        // Migration: Check if mindMap is in old format (direct object vs {data, date})
+        if (savedFiles.mindMap && !savedFiles.mindMap.data) {
+          console.log("Migrating legacy MindMap state...");
+          savedFiles.mindMap = {
+            data: savedFiles.mindMap,
+            date: '' // Default or empty if we can't re-parse easily without the file
+          };
+        }
+        setFiles(savedFiles);
+      }
 
       const savedConfig = await loadAppState('app_config');
       if (savedConfig) setConfig(savedConfig);
@@ -183,7 +193,8 @@ const App: React.FC = () => {
         setFiles(prev => ({ ...prev, template: buffer }));
       } else if (type === 'mindMap') {
         const text = await file.text();
-        setFiles(prev => ({ ...prev, mindMap: MindMapParser(text) }));
+        const parsed = MindMapParser(text);
+        setFiles(prev => ({ ...prev, mindMap: parsed }));
       } else if (type === 'gamesList') {
         const text = await file.text();
         setFiles(prev => ({ ...prev, gamesList: GamesListParser(text) }));
@@ -258,7 +269,7 @@ const App: React.FC = () => {
       // 1. Get targets: Mapping Content from Row 2 of Calendar to Mind Map keys
       // The content from the calendar is used to look up the mind map.
       // We'll search the mind map for keys containing the 'content' string.
-      const mindMapMatch = Object.entries(files.mindMap).find(([key, _]) =>
+      const mindMapMatch = Object.entries(files.mindMap.data).find(([key, _]) =>
         key.includes(targetDay) || key.includes(dayData.content.toLowerCase().slice(0, 10))
       );
       const targets = mindMapMatch?.[1] || "Learning targets for " + dayData.content;
@@ -299,7 +310,7 @@ const App: React.FC = () => {
         'Class': config.className,
         'Teacher Name': config.teacherName,
         "Teacher's Name": config.teacherName,
-        'Date': new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+        'Date': files.mindMap.date || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
         'Objectives': synthData.objectives,
         'Materials': synthData.materials,
         'Introductions': synthData.introduction,
@@ -456,6 +467,38 @@ const App: React.FC = () => {
               <p className="text-[10px] text-white/20 truncate">{activeSetName}</p>
             </div>
           </button>
+
+          <div className="pt-4 border-t border-white/10 space-y-4 hidden lg:block">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-white/20 uppercase tracking-widest pl-1">Identity</label>
+              <div className="space-y-2">
+                <div className="relative group/input">
+                  <div className="absolute inset-y-0 left-3 flex items-center text-white/20 group-focus-within/input:text-primary transition-colors">
+                    <span className="text-[10px] font-bold">T</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={config.teacherName}
+                    onChange={(e) => setConfig({ ...config, teacherName: e.target.value })}
+                    placeholder="Teacher Name"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                  />
+                </div>
+                <div className="relative group/input">
+                  <div className="absolute inset-y-0 left-3 flex items-center text-white/20 group-focus-within/input:text-primary transition-colors">
+                    <span className="text-[10px] font-bold">C</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={config.className}
+                    onChange={(e) => setConfig({ ...config, className: e.target.value })}
+                    placeholder="Class Name"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </nav>
 
         <div className="mt-auto p-4 glass-card lg:block hidden">

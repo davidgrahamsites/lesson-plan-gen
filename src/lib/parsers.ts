@@ -1,10 +1,13 @@
 import JSZip from 'jszip';
 
 export const MindMapParser = (content: string) => {
-    // Mind map is expected to be a TXT file with 4 weeks of content.
-    // We'll parse it into a structured object indexed by Week/Day.
     const lines = content.split('\n').filter(line => line.trim() !== '');
     const data: Record<string, string> = {};
+    let extractedDate = '';
+
+    // Simple regex to find month + day (e.g., January 15)
+    const dateMatch = content.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d+/i);
+    if (dateMatch) extractedDate = dateMatch[0];
 
     let currentWeek = '';
     lines.forEach(line => {
@@ -16,7 +19,7 @@ export const MindMapParser = (content: string) => {
         }
     });
 
-    return data;
+    return { data, date: extractedDate };
 };
 
 export const GamesListParser = (content: string) => {

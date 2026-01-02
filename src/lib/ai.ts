@@ -75,7 +75,7 @@ export const AdvancedLessonPlanSynthesizer = async (
     apiKey: string
 ) => {
     const prompt = `
-    You are an expert curriculum designer. Based on the context below, generate a professional, detailed lesson plan.
+    You are an expert curriculum designer for ESL. Generate a professional lesson plan.
     
     CONTEXT:
     Day: ${context.day}
@@ -88,31 +88,27 @@ export const AdvancedLessonPlanSynthesizer = async (
     Teacher: ${context.teacherName}
     Class: ${context.className}
 
-    STRICT FORMATTING RULES:
-    1. NO BOLDING. Do not use asterisks (**) or any markdown bolding.
-    2. NO META-COMMENTARY. Do not include phrases like "Adapt the game to...", "For this game...", "Based on...", or "Here is the plan...".
-    3. NO "AI" SUMMARIES. Do not rewrite or shorten the game description.
-    4. NO BULLET POINTS with ".,".
+    STRICT RULES FOR BREVITY:
+    1. EXTREME BREVITY. This is for a busy teacher. No long paragraphs.
+    2. SECTION LIMITS:
+       - Objectives: Max 2 short bullet points.
+       - Introduction: Max 2 short sentences.
+       - Activity: Max 3 short steps.
+       - Game: Paste the Name and a brief 1-2 sentence version of the description.
+       - Closure: Max 1 sentence.
+    3. NO BOLDING. NO Meta-commentary. NO "For this game...". NO "AI" narrating.
+    4. INTRODUCTION: Briefly incorporate the two spiral review items.
     
-    SECTION SPECIFIC RULES:
-    - GAME SECTION: You MUST output the literal 'Game Name' followed by the literal 'Game Description' provided. Do not summarize it. Do not adapt it with AI notes. Just paste it.
-    - INTRODUCTION SECTION: Include the spiral review items naturally within the intro flow. Use the literal spiral review text.
-    - OBJECTIVES: Use the literal Learning Targets to form 1-3 specific objectives.
-    - STYLE: Professional, concise, and clean.
-
-    OUTPUT FORMAT:
-    Return a valid JSON object:
+    OUTPUT FORMAT (JSON ONLY):
     {
-      "activityName": "e.g., WEEK 2 THURSDAY - PHONICS",
-      "objectives": "List of 1-3 objectives.",
-      "materials": "List of materials needed.",
-      "introduction": "Intro steps (5 mins) including the spiral review.",
-      "activity": "Step-by-step teaching activity (8 mins).",
-      "game": "LITERAL Game Name\\nLITERAL Game Description",
-      "closure": "Wrap-up (4 mins) with review and praise."
+      "activityName": "WEEK X [DAY] - [SUBJECT]",
+      "objectives": "Concise list.",
+      "materials": "Concise list.",
+      "introduction": "Very short intro.",
+      "activity": "Short activity steps.",
+      "game": "LITERAL Name\\nBrief adapted description.",
+      "closure": "Short closing."
     }
-
-    Respond ONLY with the JSON object.
   `;
 
     const getResponse = async (p: string) => {
