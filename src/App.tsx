@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { MindMapParser, GamesListParser, TemplateProcessor } from './lib/parsers';
+import { MindMapParser, GamesListParser, TemplateProcessor, CalendarTableParser } from './lib/parsers';
 import { AISynthesizer, OCRProcessor } from './lib/ai';
 import { saveAs } from 'file-saver';
 
@@ -31,7 +31,7 @@ interface Message {
 
 interface FileState {
   mindMap: Record<string, string> | null;
-  calendar: string | null;
+  calendar: Record<string, { subject: string, content: string, game: string }> | null;
   gamesList: Record<string, string> | null;
   template: ArrayBuffer | null;
 }
@@ -61,6 +61,9 @@ const App: React.FC = () => {
     apiKey: ''
   });
 
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -80,7 +83,7 @@ const App: React.FC = () => {
         setFiles(prev => ({ ...prev, gamesList: GamesListParser(text) }));
       } else if (type === 'calendar') {
         const text = await OCRProcessor(file);
-        setFiles(prev => ({ ...prev, calendar: text }));
+        setFiles(prev => ({ ...prev, calendar: CalendarTableParser(text) }));
       }
 
       setMessages(prev => [...prev, {
@@ -123,23 +126,46 @@ const App: React.FC = () => {
     }
 
     const targetDay = query.toLowerCase().match(/(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/)?.[0] || 'monday';
+    const dayData = files.calendar[targetDay];
+
+    if (!dayData) {
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        text: `Could not find schedule data for ${targetDay} in the uploaded calendar.`,
+        sender: 'system',
+        timestamp: new Date()
+      }]);
+      return;
+    }
 
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
-      text: `Generating lesson plan for ${targetDay}...`,
+      text: `Generating: ${targetDay.toUpperCase()} - ${dayData.subject}...`,
       sender: 'ai',
       timestamp: new Date()
     }]);
 
     try {
-      const targets = files.mindMap[`week 1 ${targetDay}`] || "General Learning Targets";
-      const gameName = "The Target Game"; // Extraction logic would go here
-      const genericDesc = files.gamesList[gameName.toLowerCase()] || "Play a game about [topic]";
+      // 1. Get targets: Mapping Content from Row 2 of Calendar to Mind Map keys
+      // The content from the calendar is used to look up the mind map.
+      // We'll search the mind map for keys containing the 'content' string.
+      const mindMapMatch = Object.entries(files.mindMap).find(([key, _]) =>
+        key.includes(targetDay) || key.includes(dayData.content.toLowerCase().slice(0, 10))
+      );
+      const targets = mindMapMatch?.[1] || "Learning targets for " + dayData.content;
+
+      // 2. Identify the Game from Games List
+      // We'll search the games list for names mentioned in the calendar row
+      const gameMatch = Object.keys(files.gamesList).find(name =>
+        dayData.game.toLowerCase().includes(name)
+      );
+      const genericDesc = gameMatch ? files.gamesList[gameMatch] : "Educational game for [topic]";
 
       const finalGameDesc = await AISynthesizer(genericDesc, targets, config.provider, config.apiKey);
 
       const finalDoc = await TemplateProcessor(files.template, {
         'DAY': targetDay.toUpperCase(),
+        'SUBJECT': dayData.subject,
         'TARGETS': targets,
         'GAME_DESCRIPTION': finalGameDesc
       });
@@ -163,21 +189,59 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            setPendingImage(event.target?.result as string);
+            setPendingFile(file);
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() && !pendingFile) return;
+
+    const userText = inputValue;
+    const currentPendingFile = pendingFile;
 
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
-      text: inputValue,
+      text: userText || "Pasted Image",
       sender: 'user',
       timestamp: new Date()
     }]);
 
-    if (inputValue.toLowerCase().includes('generate')) {
-      generateLessonPlan(inputValue);
-    }
-
     setInputValue('');
+    setPendingImage(null);
+    setPendingFile(null);
+
+    if (currentPendingFile) {
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        text: "OCR-ing pasted image...",
+        sender: 'system',
+        timestamp: new Date()
+      }]);
+      const ocrResult = await OCRProcessor(currentPendingFile);
+      setFiles(prev => ({ ...prev, calendar: CalendarTableParser(ocrResult) }));
+
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        text: "Pasted calendar processed. You can now type 'Generate' for a specific day.",
+        sender: 'system',
+        timestamp: new Date()
+      }]);
+    } else if (userText.toLowerCase().includes('generate')) {
+      generateLessonPlan(userText);
+    }
   };
 
   return (
@@ -270,6 +334,15 @@ const App: React.FC = () => {
           </div>
 
           <div className="relative group">
+            {pendingImage && (
+              <div className="absolute bottom-full mb-4 left-0 p-2 glass-card animate-in fade-in slide-in-from-bottom-4">
+                <img src={pendingImage} alt="Pending" className="max-h-32 rounded-lg" />
+                <button
+                  onClick={() => { setPendingImage(null); setPendingFile(null); }}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                >&times;</button>
+              </div>
+            )}
             <div className="absolute -inset-0.5 bg-gradient-to-r from-primary to-purple-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-500" />
             <div className="relative flex items-center glass-card p-2">
               <input
@@ -277,7 +350,8 @@ const App: React.FC = () => {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Type 'Generate Monday lesson plan'..."
+                onPaste={handlePaste}
+                placeholder="Type 'Generate...' or paste an image"
                 className="flex-1 bg-transparent border-none focus:ring-0 px-4 py-2 text-white placeholder:text-white/20"
               />
               <button

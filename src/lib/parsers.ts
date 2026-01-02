@@ -36,6 +36,43 @@ export const GamesListParser = (content: string) => {
     return games;
 };
 
+export const CalendarTableParser = (ocrText: string) => {
+    // User describes:
+    // Row 1: Days/Subject
+    // Row 2: General Content + Game Name
+
+    const lines = ocrText.split('\n').filter(l => l.trim().length > 3);
+    const calendarData: Record<string, { subject: string, content: string, game: string }> = {};
+
+    // OCR usually outputs text in a way that rows are sequential or columns are sequential.
+    // We'll look for Day keywords (Monday, etc.) to segment.
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+    // Simple heuristic: If we find a line with a day name, assume it's part of the header.
+    // This is a difficult problem without LLM-based layout detection, 
+    // but we'll try a flexible keyword search.
+
+    days.forEach(day => {
+        const dayIndex = lines.findIndex(l => l.toLowerCase().includes(day));
+        if (dayIndex !== -1) {
+            // Heuristic: Subject is often on the same line or next line
+            const subject = lines[dayIndex].replace(new RegExp(day, 'i'), '').trim() || lines[dayIndex + 1] || "";
+
+            // Row 2 logic: Search for content/games in subsequent lines until next day
+            // For now, we'll take the next available non-empty lines
+            const row2Text = lines.slice(dayIndex + 2, dayIndex + 5).join(' ');
+
+            calendarData[day] = {
+                subject,
+                content: row2Text, // This will be used to match Mind Map targets
+                game: row2Text     // This will be parsed for Game Names
+            };
+        }
+    });
+
+    return calendarData;
+};
+
 export const TemplateProcessor = async (arrayBuffer: ArrayBuffer, data: Record<string, string>) => {
     // Simple template replacement for DOCX using a ZIP/XML approach
     // In a real app, libraries like docxtemplater are better, 
