@@ -8,7 +8,10 @@ import {
   Upload,
   Terminal,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Download,
+  Copy,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
@@ -29,6 +32,12 @@ interface Message {
   text: string;
   sender: 'user' | 'system' | 'ai';
   timestamp: Date;
+  previewText?: string;
+  attachment?: {
+    blob: Blob;
+    filename: string;
+    extension: string;
+  };
 }
 
 interface FileState {
@@ -275,12 +284,24 @@ const App: React.FC = () => {
         'REVIEW_RECENT': review.recent || "No recent review available"
       });
 
-      saveAs(result.blob, `Lesson_Plan_${targetDay}.${result.extension}`);
+      // 4. Create descriptive filename
+      const weekMatch = mindMapMatch?.[0].match(/week\s*\d+/i);
+      const weekLabel = weekMatch ? weekMatch[0].toUpperCase() : "WEEK";
+      const displayFilename = `PK2_${weekLabel.replace(/\s+/g, '_')}_${targetDay.toUpperCase()}_Lesson_Plan`;
+
+      // 5. Construct Preview Text
+      const previewText = `**${targetDay.toUpperCase()} LESSON PLAN**\n\n**Subject:** ${dayData.subject}\n\n**Learning Targets:**\n${targets}\n\n**Game Adaptation:**\n${finalGameDesc}\n\n**Spiral Review:**\n- Oldest: ${review.oldest}\n- Recent: ${review.recent}`;
 
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
-        text: `Done! Your lesson plan for ${targetDay} has been generated and downloaded.`,
-        sender: 'system',
+        text: `Success! Generated ${displayFilename}.${result.extension}`,
+        sender: 'ai',
+        previewText: previewText,
+        attachment: {
+          blob: result.blob,
+          filename: displayFilename,
+          extension: result.extension
+        },
         timestamp: new Date()
       }]);
     } catch (error) {
@@ -449,7 +470,28 @@ const App: React.FC = () => {
                         : "bg-white/5 border border-white/10 text-white/90 backdrop-blur-sm"
                   )}
                 >
-                  {msg.text}
+                  <div className="whitespace-pre-wrap">{msg.previewText || msg.text}</div>
+
+                  {msg.attachment && (
+                    <div className="mt-4 pt-4 border-t border-white/10 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => saveAs(msg.attachment!.blob, `${msg.attachment!.filename}.${msg.attachment!.extension}`)}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/20 text-primary hover:bg-primary/30 transition-all text-xs font-medium"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download .{msg.attachment.extension}
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(msg.previewText || msg.text);
+                        }}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 transition-all text-xs font-medium"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        Copy Text
+                      </button>
+                    </div>
+                  )}
                 </motion.div>
               ))}
             </AnimatePresence>
