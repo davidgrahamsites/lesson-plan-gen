@@ -10,15 +10,14 @@ import {
   Sparkles,
   ChevronRight,
   Download,
-  Copy,
-  Check
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 import { MindMapParser, GamesListParser, TemplateProcessor, CalendarTableParser, SpiralReviewParser, GetSpiralReviewItems } from './lib/parsers';
-import { AISynthesizer, OCRProcessor } from './lib/ai';
+import { OCRProcessor, AdvancedLessonPlanSynthesizer } from './lib/ai';
 import { saveAs } from 'file-saver';
 import { saveAppState, loadAppState, listSets, saveSetMetadata } from './lib/storage';
 import { Layers, Save, FolderOpen } from 'lucide-react';
@@ -71,7 +70,9 @@ const App: React.FC = () => {
 
   const [config, setConfig] = useState({
     provider: 'openai' as 'openai' | 'gemini',
-    apiKey: ''
+    apiKey: '',
+    teacherName: 'Daniel',
+    className: 'PK2'
   });
 
   const [spiralIndex, setSpiralIndex] = useState(0);
@@ -263,34 +264,77 @@ const App: React.FC = () => {
       const targets = mindMapMatch?.[1] || "Learning targets for " + dayData.content;
 
       // 2. Identify the Game from Games List
-      // We'll search the games list for names mentioned in the calendar row
       const gameMatch = Object.keys(files.gamesList).find(name =>
-        dayData.game.toLowerCase().includes(name)
+        dayData.game.toLowerCase().includes(name.toLowerCase())
       );
       const genericDesc = gameMatch ? files.gamesList[gameMatch] : "Educational game for [topic]";
-
-      const finalGameDesc = await AISynthesizer(genericDesc, targets, config.provider, config.apiKey);
 
       // 3. Get Spiral Review Sentences
       const review = GetSpiralReviewItems(files.spiralReview, spiralIndex);
       setSpiralIndex(review.nextIndex);
 
-      const result = await TemplateProcessor(files.template, {
-        'DAY': targetDay.toUpperCase(),
-        'SUBJECT': dayData.subject,
-        'TARGETS': targets,
-        'GAME_DESCRIPTION': finalGameDesc,
-        'REVIEW_OLDEST': review.oldest || "No oldest review available",
-        'REVIEW_RECENT': review.recent || "No recent review available"
-      });
-
-      // 4. Create descriptive filename
       const weekMatch = mindMapMatch?.[0].match(/week\s*\d+/i);
       const weekLabel = weekMatch ? weekMatch[0].toUpperCase() : "WEEK";
+
+      // 4. Advanced AI Synthesis
+      const synthData = await AdvancedLessonPlanSynthesizer(
+        {
+          day: targetDay.toUpperCase(),
+          subject: dayData.subject,
+          targets: targets,
+          genericGame: genericDesc,
+          spiralReview: { oldest: review.oldest || 'N/A', recent: review.recent || 'N/A' },
+          teacherName: config.teacherName,
+          className: config.className
+        },
+        config.provider,
+        config.apiKey
+      );
+
+      // 5. Process Template with expanded fields
+      const result = await TemplateProcessor(files.template, {
+        // Human-friendly keys (for .txt templates)
+        'Activity Name': synthData.activityName,
+        'Class': config.className,
+        'Teacher Name': config.teacherName,
+        "Teacher's Name": config.teacherName,
+        'Date': new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+        'Objectives': synthData.objectives,
+        'Materials': synthData.materials,
+        'Introductions': synthData.introduction,
+        'Activity': synthData.activity,
+        'Game': synthData.game,
+        'Closure': synthData.closure,
+
+        // Uppercase keys (traditional)
+        'ACTIVITY_NAME': synthData.activityName,
+        'CLASS': config.className,
+        'TEACHER': config.teacherName,
+        'DATE': new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+        'DAY': targetDay.toUpperCase(),
+        'SUBJECT': dayData.subject,
+        'OBJECTIVES': synthData.objectives,
+        'MATERIALS': synthData.materials,
+        'INTRODUCTIONS': synthData.introduction,
+        'ACTIVITY': synthData.activity,
+        'GAME': synthData.game,
+        'CLOSURE': synthData.closure,
+        'REVIEW_OLDEST': review.oldest || "N/A",
+        'REVIEW_RECENT': review.recent || "N/A"
+      });
+
       const displayFilename = `PK2_${weekLabel.replace(/\s+/g, '_')}_${targetDay.toUpperCase()}_Lesson_Plan`;
 
-      // 5. Construct Preview Text
-      const previewText = `**${targetDay.toUpperCase()} LESSON PLAN**\n\n**Subject:** ${dayData.subject}\n\n**Learning Targets:**\n${targets}\n\n**Game Adaptation:**\n${finalGameDesc}\n\n**Spiral Review:**\n- Oldest: ${review.oldest}\n- Recent: ${review.recent}`;
+      // 6. Construct Preview Text (Full version)
+      const previewText = `### ${synthData.activityName}\n\n` +
+        `**Class:** ${config.className} | **Teacher:** ${config.teacherName}\n` +
+        `**Objectives:**\n${synthData.objectives}\n\n` +
+        `**Materials:**\n${synthData.materials}\n\n` +
+        `**Process:**\n` +
+        `**Introduction:** ${synthData.introduction}\n\n` +
+        `**Activity:** ${synthData.activity}\n\n` +
+        `**Game:** ${synthData.game}\n\n` +
+        `**Closure:** ${synthData.closure}`;
 
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
@@ -548,6 +592,26 @@ const App: React.FC = () => {
                 <button onClick={() => setConfigOpen(false)} className="text-white/40 hover:text-white text-2xl">&times;</button>
               </div>
               <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-white/40 uppercase mb-2">Teacher Name</label>
+                  <input
+                    type="text"
+                    value={config.teacherName}
+                    onChange={(e) => setConfig({ ...config, teacherName: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                    placeholder="Enter teacher name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-white/40 uppercase mb-2">Class Name</label>
+                  <input
+                    type="text"
+                    value={config.className}
+                    onChange={(e) => setConfig({ ...config, className: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                    placeholder="Enter class name (e.g., PK2)"
+                  />
+                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-white/40 uppercase tracking-wider">AI Provider</label>
                   <select

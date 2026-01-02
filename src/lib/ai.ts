@@ -60,3 +60,95 @@ export const AISynthesizer = async (
         return data.candidates[0].content.parts[0].text;
     }
 };
+export const AdvancedLessonPlanSynthesizer = async (
+    context: {
+        day: string;
+        subject: string;
+        targets: string;
+        genericGame: string;
+        spiralReview: { oldest: string; recent: string };
+        teacherName: string;
+        className: string;
+    },
+    provider: 'openai' | 'gemini',
+    apiKey: string
+) => {
+    const prompt = `
+    You are an expert curriculum designer. Based on the context below, generate a detailed lesson plan session.
+    
+    CONTEXT:
+    Day: ${context.day}
+    Subject: ${context.subject}
+    Learning Targets: ${context.targets}
+    Generic Game Base: ${context.genericGame}
+    Spiral Review (Oldest): ${context.spiralReview.oldest}
+    Spiral Review (Recent): ${context.spiralReview.recent}
+    Teacher: ${context.teacherName}
+    Class: ${context.className}
+
+    TASK:
+    Populate a structured lesson plan. Ensure it stays 100% true to the Learning Targets and Subject provided.
+    The game section MUST be an adaptation of the 'Generic Game Base' provided, tailored to the specific' Learning Targets'.
+
+    OUTPUT FORMAT:
+    You must return a valid JSON object strictly following this structure:
+    {
+      "activityName": "e.g., WEEK 2 MONDAY - PHONICS /x/",
+      "objectives": "Bulleted list of 1-3 specific objectives starting with action verbs.",
+      "materials": "Bulleted list of materials needed.",
+      "introduction": "Short intro (5 mins) including the sentence review using BOTH spiral review items.",
+      "activity": "Step-by-step teaching activity (8 mins).",
+      "game": "The adapted game description (8 mins) based on the generic game base.",
+      "closure": "Quick wrap-up (4 mins) with review and praise."
+    }
+
+    Respond ONLY with the JSON object. Do not include markdown formatting or extra text.
+  `;
+
+    const getResponse = async (p: string) => {
+        if (provider === 'openai') {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o-mini',
+                    messages: [{ role: 'user', content: p }],
+                    response_format: { type: "json_object" }
+                })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(`OpenAI Error: ${data.error.message}`);
+            return data.choices[0].message.content;
+        } else {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: p }] }]
+                })
+            });
+            const data = await response.json();
+            if (data.error) throw new Error(`Gemini Error: ${data.error.message}`);
+            // Gemini flash doesn't always support json mode as cleanly, but we'll try to parse it.
+            let text = data.candidates[0].content.parts[0].text;
+            // Strip markdown block if present
+            if (text.includes('```json')) {
+                text = text.split('```json')[1].split('```')[0].trim();
+            } else if (text.includes('```')) {
+                text = text.split('```')[1].split('```')[0].trim();
+            }
+            return text;
+        }
+    };
+
+    const resultText = await getResponse(prompt);
+    try {
+        return JSON.parse(resultText);
+    } catch (e) {
+        console.error("Failed to parse AI JSON:", resultText);
+        throw new Error("AI returned an invalid JSON format. Please try again.");
+    }
+};
