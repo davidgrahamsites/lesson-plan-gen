@@ -17,6 +17,7 @@ import { twMerge } from 'tailwind-merge';
 import { MindMapParser, GamesListParser, TemplateProcessor, CalendarTableParser, SpiralReviewParser, GetSpiralReviewItems } from './lib/parsers';
 import { AISynthesizer, OCRProcessor } from './lib/ai';
 import { saveAs } from 'file-saver';
+import { saveAppState, loadAppState } from './lib/storage';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -67,6 +68,48 @@ const App: React.FC = () => {
 
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const isHydrated = useRef(false);
+
+  // Load state on mount
+  useEffect(() => {
+    const initPersistence = async () => {
+      const savedFiles = await loadAppState('app_files');
+      if (savedFiles) setFiles(savedFiles);
+
+      const savedConfig = await loadAppState('app_config');
+      if (savedConfig) setConfig(savedConfig);
+
+      const savedSpiralIndex = await loadAppState('app_spiral_index');
+      if (savedSpiralIndex !== null) setSpiralIndex(savedSpiralIndex);
+
+      const savedMessages = await loadAppState('app_messages');
+      if (savedMessages) setMessages(savedMessages);
+
+      isHydrated.current = true;
+    };
+    initPersistence();
+  }, []);
+
+  // Persist state changes
+  useEffect(() => {
+    if (!isHydrated.current) return;
+    saveAppState('app_files', files);
+  }, [files]);
+
+  useEffect(() => {
+    if (!isHydrated.current) return;
+    saveAppState('app_config', config);
+  }, [config]);
+
+  useEffect(() => {
+    if (!isHydrated.current) return;
+    saveAppState('app_spiral_index', spiralIndex);
+  }, [spiralIndex]);
+
+  useEffect(() => {
+    if (!isHydrated.current) return;
+    saveAppState('app_messages', messages);
+  }, [messages]);
 
   useEffect(() => {
     if (scrollRef.current) {
