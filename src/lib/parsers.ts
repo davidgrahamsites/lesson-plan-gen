@@ -46,14 +46,9 @@ export const CalendarTableParser = (ocrText: string) => {
         'sat': 'saturday', 'sun': 'sunday'
     };
 
-    let extractedSong = "Song of the Week"; // Default
-    let extractedWeek = ""; // Found week label (e.g. "Week 3")
-
-    // Heuristic: Look for "Song" or "Sing" in the FIRST 5 lines (usually header info)
-    const headerLines = lines.slice(0, 10);
-
     let extractedSong = "Song of the Week";
     let extractedWeek = "";
+    const headerLines = lines.slice(0, 10);
 
     // 1. Aggressive Week Detection (Look anywhere in text)
     const weekRegex = /week\s*(\d+)/i;
