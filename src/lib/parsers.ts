@@ -51,127 +51,101 @@ export const CalendarTableParser = (ocrText: string) => {
 
     // Heuristic: Look for "Song" or "Sing" in the FIRST 5 lines (usually header info)
     const headerLines = lines.slice(0, 10);
-    const songLine = headerLines.find(l => l.toLowerCase().includes('song') || l.toLowerCase().includes('sing'));
-    if (songLine) {
-        // Clean up: remove "Song:" prefix if present
-        extractedSong = songLine.replace(/song\s*:?/i, '').replace(/sing\s*:?/i, '').trim() || songLine;
-    }
 
-    // Heuristic: Look for "Week" + Number in header lines
-    const weekLine = headerLines.find(l => /week\s*\d+/i.test(l));
-    if (weekLine) {
-        const match = weekLine.match(/week\s*\d+/i);
-        if (match) extractedWeek = match[0].toUpperCase();
-    }
+    let extractedSong = "Song of the Week";
+    let extractedWeek = "";
 
-    const findDayInLine = (line: string) => {
-        const lower = line.toLowerCase();
-        for (const day of days) {
-            if (lower.includes(day)) return day;
-        }
-        for (const [abbr, full] of Object.entries(abbreviations)) {
-            // Check for abbreviation as a word (e.g. "Mon" not "Monday")
-            const regex = new RegExp(`\\b${abbr}\\b`, 'i');
-            if (regex.test(lower)) return full;
-        }
-        return null;
-    };
+    // 1. Aggressive Week Detection (Look anywhere in text)
+    const weekRegex = /week\s*(\d+)/i;
+    const weekMatch = ocrText.match(weekRegex);
+    if (weekMatch) extractedWeek = `WEEK ${weekMatch[1]}`;
 
-    // Find a line that looks like a header (contains multiple day names)
+    // 2. Identify Header Lines vs Content Lines
+    // A header line contains day names. A content line is usually the one immediately following.
     const headerLineIndex = lines.findIndex(line => {
-        const lowerLine = line.toLowerCase();
-        // Trigger if at least ONE day or abbreviation is found (good for clips)
-        return days.some(d => lowerLine.includes(d)) ||
-            Object.keys(abbreviations).some(abbr => new RegExp(`\\b${abbr}\\b`, 'i').test(lowerLine));
+        const lower = line.toLowerCase();
+        return days.some(d => lower.includes(d)) ||
+            Object.keys(abbreviations).some(abbr => new RegExp(`\\b${abbr}\\b`, 'i').test(lower));
     });
 
-    const isMetadata = (text: string) => {
-        const lower = text.toLowerCase();
-        return lower.includes('small group') ||
-            lower.includes('song of the week') ||
-            lower.includes('weekly') ||
-            lower.length < 2;
-    };
-
     if (headerLineIndex !== -1) {
-        // COLUMN-BASED TABLE detected
         const headerLine = lines[headerLineIndex];
-        const contentLine = lines[headerLineIndex + 1] || "";
+        const contentLines = lines.slice(headerLineIndex + 1, headerLineIndex + 5);
         const lowerHeader = headerLine.toLowerCase();
 
-        // Detect all present days in the header
-        const presentDays: Array<{ day: string, start: number }> = [];
+        // Find positions of all columns
+        const columns: Array<{ day?: string, isSong?: boolean, isSmallGroup?: boolean, start: number, end: number }> = [];
+
+        // Helper to add column if not overlapping
+        const addCol = (start: number, end: number, data: any) => {
+            if (!columns.some(c => Math.abs(c.start - start) < 5)) {
+                columns.push({ start, end, ...data });
+            }
+        };
+
         days.forEach(day => {
-            const start = lowerHeader.indexOf(day);
-            if (start !== -1) presentDays.push({ day, start });
+            const idx = lowerHeader.indexOf(day);
+            if (idx !== -1) {
+                // Find end: next meaningful space or day
+                addCol(idx, idx + day.length, { day });
+            }
         });
+
         Object.entries(abbreviations).forEach(([abbr, full]) => {
             const regex = new RegExp(`\\b${abbr}\\b`, 'gi');
             let match;
             while ((match = regex.exec(lowerHeader)) !== null) {
-                if (!presentDays.some(pd => pd.day === full)) {
-                    presentDays.push({ day: full, start: match.index });
-                }
+                addCol(match.index, match.index + abbr.length, { day: full });
             }
         });
 
-        presentDays.sort((a, b) => a.start - b.start).forEach((pd, index) => {
-            const start = pd.start;
-            const nextPd = presentDays[index + 1];
-            const end = nextPd ? nextPd.start : headerLine.length;
+        // Special check for Song column
+        const songIdx = lowerHeader.indexOf('song');
+        if (songIdx !== -1) addCol(songIdx, songIdx + 4, { isSong: true });
 
-            let subject = headerLine.slice(start, end).replace(/[-—|]/g, '').trim();
-            // Strip any day names from subject
-            days.forEach(d => { subject = subject.replace(new RegExp(d, 'gi'), ''); });
-            Object.keys(abbreviations).forEach(abbr => { subject = subject.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), ''); });
-            subject = subject.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '').trim();
+        // Sort columns by position to determine boundaries
+        columns.sort((a, b) => a.start - b.start);
+        for (let i = 0; i < columns.length; i++) {
+            columns[i].end = columns[i + 1]?.start || headerLine.length + 20;
+        }
 
-            let content = contentLine.slice(start, end).replace(/[-—|]/g, '').trim();
+        // Process each column
+        columns.forEach(col => {
+            const segmentHeader = headerLine.slice(col.start, col.end).trim();
+            // Get content from the lines below in this horizontal slice
+            const segmentContent = contentLines.map(line => {
+                if (line.length < col.start) return "";
+                return line.slice(col.start, col.end).trim();
+            }).filter(s => s.length > 0).join(' ');
 
-            if (!isMetadata(subject) || !isMetadata(content)) {
-                calendarData[pd.day] = {
+            if (col.isSong) {
+                if (segmentContent && segmentContent.length > 3) extractedSong = segmentContent;
+            } else if (col.day) {
+                let subject = segmentHeader.replace(new RegExp(col.day, 'gi'), '').replace(/[-—|:]/g, '').trim();
+                Object.keys(abbreviations).forEach(abbr => subject = subject.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), ''));
+
+                calendarData[col.day] = {
                     subject: subject || "Vocabulary",
-                    content: isMetadata(content) ? "" : content,
-                    game: isMetadata(content) ? "" : content
-                };
-            }
-        });
-    } else {
-        // ROW-BASED or messy OCR
-        days.forEach(day => {
-            let dayIndex = lines.findIndex(l => l.toLowerCase().includes(day));
-            if (dayIndex === -1) {
-                // Try abbreviation
-                const abbr = Object.keys(abbreviations).find(a => abbreviations[a] === day);
-                if (abbr) dayIndex = lines.findIndex(l => new RegExp(`\\b${abbr}\\b`, 'i').test(l));
-            }
-
-            if (dayIndex !== -1) {
-                let subject = lines[dayIndex].replace(/[-—|]/g, '').trim();
-                days.forEach(d => { subject = subject.replace(new RegExp(d, 'gi'), ''); });
-                Object.keys(abbreviations).forEach(abbr => { subject = subject.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), ''); });
-
-                if (isMetadata(subject)) subject = lines[dayIndex + 1] || "General";
-
-                const row2Text = lines.slice(dayIndex + 1, dayIndex + 4).join(' ');
-
-                calendarData[day] = {
-                    subject: subject.trim(),
-                    content: row2Text,
-                    game: row2Text
+                    content: segmentContent,
+                    game: segmentContent
                 };
             }
         });
     }
 
-    // FINAL FALLBACK: If we found NOTHING but the OCR has text, and it's a "clip",
-    // assign the whole string to 'monday' or the first day so it's not empty.
+    // FINAL FALLBACK: If we still have nothing, or if a specific day was requested but not found
+    // we assign the most likely content to Monday just so the user isn't blocked.
+    if (Object.keys(calendarData).length === 0) {
+        days.forEach(day => {
+            if (ocrText.toLowerCase().includes(day)) {
+                calendarData[day] = { subject: "Vocabulary", content: ocrText, game: ocrText };
+            }
+        });
+    }
+
+    // Last resort fallback
     if (Object.keys(calendarData).length === 0 && lines.length > 0) {
-        calendarData['monday'] = {
-            subject: "Pasted Content",
-            content: ocrText,
-            game: ocrText
-        };
+        calendarData['monday'] = { subject: "Pasted Content", content: ocrText, game: ocrText };
     }
 
     return { data: calendarData, song: extractedSong, week: extractedWeek };
