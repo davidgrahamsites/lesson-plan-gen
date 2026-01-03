@@ -115,6 +115,7 @@ export const AdvancedLessonPlanSynthesizer = async (
        - Game (8 minutes):
          * literal ${context.gameName}.
          * literal ${context.gameDescription}.
+         * CAUTION: DO NOT invent game mechanics. If the provided description is generic (e.g. "Educational game based on curriculum targets"), just state the game name and that it should be played using the learning targets.
        - Closure (4 minutes):
          * 3 specific steps for wrap-up based on targets.
 

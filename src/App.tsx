@@ -299,12 +299,12 @@ const App: React.FC = () => {
 
       // FUZZY WORD SET MATCH: Split by spaces and count overlaps
       const findFuzzyGame = () => {
-        const messyWords = new Set(messyGameText.split(/\s+/).filter(w => w.length > 3));
+        const messyWords = new Set(messyGameText.split(/\s+/).filter(w => w.length >= 3));
         let bestMatch = "";
         let maxOverlap = 0;
 
         Object.keys(files.gamesList).forEach(name => {
-          const cleanWords = name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          const cleanWords = name.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
           const overlap = cleanWords.filter(w => messyWords.has(w)).length;
           if (overlap > maxOverlap && overlap >= 1) {
             maxOverlap = overlap;
