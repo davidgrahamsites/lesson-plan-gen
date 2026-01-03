@@ -295,14 +295,28 @@ const App: React.FC = () => {
       const targets = mindMapMatch?.[1] || "Learning targets for " + dayData.content;
 
       // 2. Identify the Game from Games List
-      // Robust Match: text might be messy "Practice Week Week 3 Circle the Answer..."
-      // We check if any CLEAN game name exists inside the messy text.
       const messyGameText = dayData.game.toLowerCase();
-      const gameMatch = Object.keys(files.gamesList).find(name => {
-        return messyGameText.includes(name.toLowerCase());
-      });
 
-      // LOOSER MATCH: Try to use clean name, but if not found, use cleaned OCR text.
+      // FUZZY WORD SET MATCH: Split by spaces and count overlaps
+      const findFuzzyGame = () => {
+        const messyWords = new Set(messyGameText.split(/\s+/).filter(w => w.length > 3));
+        let bestMatch = "";
+        let maxOverlap = 0;
+
+        Object.keys(files.gamesList).forEach(name => {
+          const cleanWords = name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          const overlap = cleanWords.filter(w => messyWords.has(w)).length;
+          if (overlap > maxOverlap && overlap >= 1) {
+            maxOverlap = overlap;
+            bestMatch = name;
+          }
+        });
+        return bestMatch;
+      };
+
+      const gameMatch = findFuzzyGame();
+
+      // LOOSER MATCH: Try fuzzy match, then clean OCR text.
       const cleanGameName = gameMatch || dayData.game.replace(/practice\s*week\s*\d*/gi, '').replace(/small\s*group/gi, '').trim();
       const genericDesc = gameMatch ? files.gamesList[gameMatch] : "Educational game based on curriculum targets.";
 

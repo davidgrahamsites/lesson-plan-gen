@@ -48,19 +48,26 @@ export const CalendarTableParser = (ocrText: string) => {
 
     let extractedSong = "Song of the Week";
     let extractedWeek = "";
-    const headerLines = lines.slice(0, 10);
 
-    // 1. Aggressive Week Detection (Look anywhere in text)
-    const weekRegex = /week\s*(\d+)/i;
+    // 1. Robust Week Detection: Specifically look for "Week" followed by exactly 1-2 digits, 
+    // and ignore if it's part of a date like "January 19"
+    const weekRegex = /week\s*([1-8])\b/i;
     const weekMatch = ocrText.match(weekRegex);
-    if (weekMatch) extractedWeek = `WEEK ${weekMatch[1]}`;
+    if (weekMatch) {
+        extractedWeek = `WEEK ${weekMatch[1]}`;
+    } else {
+        // Fallback: look for lonely numbers at start of lines
+        const lonelyWeek = lines.find(l => /^week\s*\d+\s*$/i.test(l));
+        if (lonelyWeek) extractedWeek = lonelyWeek.toUpperCase();
+    }
 
     // 2. Identify Header Lines vs Content Lines
-    // A header line contains day names. A content line is usually the one immediately following.
     const headerLineIndex = lines.findIndex(line => {
         const lower = line.toLowerCase();
-        return days.some(d => lower.includes(d)) ||
-            Object.keys(abbreviations).some(abbr => new RegExp(`\\b${abbr}\\b`, 'i').test(lower));
+        // A header row usually has multiple day markers
+        const count = days.filter(d => lower.includes(d)).length;
+        const abbrCount = Object.keys(abbreviations).filter(abbr => new RegExp(`\\b${abbr}\\b`, 'i').test(lower)).length;
+        return (count + abbrCount) >= 2;
     });
 
     if (headerLineIndex !== -1) {
@@ -106,22 +113,33 @@ export const CalendarTableParser = (ocrText: string) => {
 
         // Process each column
         columns.forEach(col => {
-            const segmentHeader = headerLine.slice(col.start, col.end).trim();
-            // Get content from the lines below in this horizontal slice
-            const segmentContent = contentLines.map(line => {
-                if (line.length < col.start) return "";
-                return line.slice(col.start, col.end).trim();
+            // Add a small 1-char cushion to avoid bleeding from neighboring letters
+            const start = col.start;
+            const end = col.end - 1;
+
+            const segmentHeader = headerLine.slice(start, end).trim();
+            // Get content from ONLY the row immediately follows or the 2 rows below (often game is in 1-2 lines)
+            const segmentContent = contentLines.slice(0, 2).map(line => {
+                if (line.length <= start) return "";
+                return line.slice(start, end).trim();
             }).filter(s => s.length > 0).join(' ');
 
             if (col.isSong) {
                 if (segmentContent && segmentContent.length > 3) extractedSong = segmentContent;
             } else if (col.day) {
+                // SUBJECT EXTRACTION: 
+                // The subject is whatever comes AFTER the day name in the header segment.
+                // e.g. "Monday - Vocabulary" -> "Vocabulary"
                 let subject = segmentHeader.replace(new RegExp(col.day, 'gi'), '').replace(/[-—|:]/g, '').trim();
-                Object.keys(abbreviations).forEach(abbr => subject = subject.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), ''));
+
+                // If it's still empty, try to look at the segment content's first few words
+                if (!subject || subject.length < 2) {
+                    subject = "Vocabulary"; // Default
+                }
 
                 calendarData[col.day] = {
-                    subject: subject || "Vocabulary",
-                    content: segmentContent,
+                    subject: subject,
+                    content: segmentContent.replace(new RegExp(days.join('|'), 'gi'), '').trim(),
                     game: segmentContent
                 };
             }
