@@ -4,7 +4,11 @@ export const OCRProcessor = async (file: File) => {
     const result = await Tesseract.recognize(file, 'eng', {
         logger: m => console.log(m)
     });
-    return result.data.text;
+    // Return structured words with spatial data
+    return result.data.words.map(w => ({
+        text: w.text,
+        bbox: w.bbox
+    }));
 };
 
 export const AISynthesizer = async (

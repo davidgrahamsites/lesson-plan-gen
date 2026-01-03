@@ -212,8 +212,8 @@ const App: React.FC = () => {
         const text = await file.text();
         setFiles(prev => ({ ...prev, spiralReview: SpiralReviewParser(text) }));
       } else if (type === 'calendar') {
-        const text = await OCRProcessor(file);
-        const parsed = CalendarTableParser(text);
+        const ocrData = await OCRProcessor(file);
+        const parsed = CalendarTableParser(ocrData);
         setFiles(prev => ({ ...prev, calendar: parsed }));
       }
 
@@ -461,8 +461,8 @@ const App: React.FC = () => {
         sender: 'system',
         timestamp: new Date()
       }]);
-      const ocrResult = await OCRProcessor(currentPendingFile);
-      setFiles(prev => ({ ...prev, calendar: CalendarTableParser(ocrResult) }));
+      const ocrData = await OCRProcessor(currentPendingFile);
+      setFiles(prev => ({ ...prev, calendar: CalendarTableParser(ocrData) }));
 
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
