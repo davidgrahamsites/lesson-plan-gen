@@ -76,7 +76,7 @@ export const AdvancedLessonPlanSynthesizer = async (
     apiKey: string
 ) => {
     const prompt = `
-    You are a strict data formatter for a lesson plan. You are NOT a creative writer.
+    You are a professional ESL curriculum developer. Generate a precise and thorough lesson plan based STRICTLY on the provided context.
     
     CONTEXT:
     Day: ${context.day}
@@ -90,24 +90,44 @@ export const AdvancedLessonPlanSynthesizer = async (
     Teacher: ${context.teacherName}
     Class: ${context.className}
 
-    CRITICAL RULES - READ CAREFULLY:
-    1. EXTREME LITERALISM. If a specific activity (like "Weather", "Calendar", "Greeting") is not in the source text, DO NOT INCLUDE IT.
-    2. ABSOLUTELY NO "FILLER". Do not add "Discuss the weather", "Sing a goodbye song", "Clean up", or "Take attendance".
-    3. INTRODUCTION FORMAT: STRICTLY: "Sing ${context.song} -> Review: ${context.spiralReview.oldest} / ${context.spiralReview.recent}". 
-       - IF THE SONG IS "Song of the Week" (default), just say "Sing Song -> Review...".
-       - DO NOT ADD ANYTHING ELSE TO INTRODUCTION.
-    4. GAME SECTION: Paste the Literal Game Name and Description. Do not summarize.
-    5. CLOSURE: Max 1 sentence reflecting on the Learning Targets.
+    STRUCTURE & CONTENT RULES:
+    1. OBJECTIVES: 
+       - Form 2-3 specific bullet points using the literal Learning Targets.
+       - DO NOT summarize or simplify (e.g., if targets say "Feelings, Family, Home", don't just say "Vocabulary").
     
+    2. MATERIALS:
+       - DYNAMIC EXTRACTION: Infer the materials from the Learning Targets.
+       - If targets list vocabulary (e.g. "bee, ant, leaf"), list them as "Vocabulary cards: [words]".
+       - Categorize them (e.g. "Feelings cards:", "Family cards:").
+       - Include specific items mention in the Game.
+    
+    3. PROCESS (WITH TIMINGS):
+       - Introduction (5 minutes):
+         * Sing ${context.song}.
+         * Sentence Review: Use the Spiral Review items (${context.spiralReview.oldest} and ${context.spiralReview.recent}). Format: "[Question] -> [Answer options]".
+       - Activity (8 minutes):
+         * Thoroughly break down the Learning Targets (${context.targets}).
+         * List the specific questions and answers for each target category.
+       - Game (8 minutes):
+         * literal ${context.gameName}.
+         * literal ${context.gameDescription}.
+       - Closure (4 minutes):
+         * 3 specific steps for wrap-up based on targets.
+
+    STYLE RULES:
+    - NO BOLDING.
+    - NO FILLER (No "Discuss the weather", "Take attendance", etc.).
+    - Professional, clean, and literal.
+
     OUTPUT FORMAT (JSON ONLY):
     {
       "activityName": "WEEK X [DAY] - [SUBJECT]",
-      "objectives": "LITERAL List of Learning Targets. COPY EXACTLY.",
-      "materials": "Concise list based ONLY on Game/Activity.",
-      "introduction": "Sing ${context.song} -> Review: ${context.spiralReview.oldest} / ${context.spiralReview.recent}",
-      "activity": "Max 3 short steps based ONLY on Learning Targets.",
-      "game": "LITERAL Name\\nLITERAL Description",
-      "closure": "Short review of targets."
+      "objectives": "• Bullet point 1\\n• Bullet point 2",
+      "materials": "• Category 1: items\\n• Category 2: items",
+      "introduction": "• Sing [Song]\\n• Sentence Review:\\n[Literal Review Text]",
+      "activity": "Detailed steps including literal targets.",
+      "game": "${context.gameName} (${context.gameDescription})",
+      "closure": "• Step 1\\n• Step 2"
     }
   `;
 

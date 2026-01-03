@@ -37,6 +37,7 @@ interface Message {
     filename: string;
     extension: string;
   };
+  generatedAt?: string;
 }
 
 interface FileState {
@@ -377,11 +378,14 @@ const App: React.FC = () => {
         `Game: ${synthData.game}\n\n` +
         `Closure: ${synthData.closure}`;
 
+      const timestampStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         text: `Success! Generated ${displayFilename}.${result.extension}`,
         sender: 'ai',
         previewText: previewText,
+        generatedAt: timestampStr,
         attachment: {
           blob: result.blob,
           filename: displayFilename,
@@ -607,6 +611,11 @@ const App: React.FC = () => {
                         <Copy className="w-3.5 h-3.5" />
                         Copy Text
                       </button>
+                    </div>
+                  )}
+                  {msg.generatedAt && (
+                    <div className="mt-2 text-[10px] text-white/20 text-right italic">
+                      Generated at {msg.generatedAt}
                     </div>
                   )}
                 </motion.div>
