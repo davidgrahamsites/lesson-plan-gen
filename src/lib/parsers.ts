@@ -65,6 +65,14 @@ export const CalendarTableParser = (ocrText: string) => {
         return days.filter(d => lowerLine.includes(d)).length >= 2;
     });
 
+    const isMetadata = (text: string) => {
+        const lower = text.toLowerCase();
+        return lower.includes('small group') ||
+            lower.includes('song of the week') ||
+            lower.includes('weekly') ||
+            lower.length < 2;
+    };
+
     if (headerLineIndex !== -1) {
         // COLUMN-BASED TABLE detected
         const headerLine = lines[headerLineIndex];
@@ -83,17 +91,21 @@ export const CalendarTableParser = (ocrText: string) => {
                 const end = otherDayStarts[0] || headerLine.length;
 
                 // Segment the header (subject) and content
-                const subject = headerLine.slice(start, end).replace(new RegExp(day, 'i'), '').trim();
+                let subject = headerLine.slice(start, end).replace(new RegExp(day, 'i'), '').replace(/[-—|]/g, '').trim();
+
+                // If subject contains other days, it likely bled. Clean it.
+                days.forEach(d => { if (d !== day) subject = subject.replace(new RegExp(d, 'i'), ''); });
 
                 // Map the content line relative to the header positions
-                // This is a rough heuristic but better than before
-                const content = contentLine.slice(start, end).trim();
+                let content = contentLine.slice(start, end).replace(/[-—|]/g, '').trim();
 
-                calendarData[day] = {
-                    subject: subject || "No Subject",
-                    content: content || "No Content",
-                    game: content // Game name is usually in the content
-                };
+                if (!isMetadata(subject)) {
+                    calendarData[day] = {
+                        subject: subject || "No Subject",
+                        content: isMetadata(content) ? "" : content,
+                        game: isMetadata(content) ? "" : content
+                    };
+                }
             }
         });
     } else {
@@ -101,8 +113,11 @@ export const CalendarTableParser = (ocrText: string) => {
         days.forEach(day => {
             const dayIndex = lines.findIndex(l => l.toLowerCase().includes(day));
             if (dayIndex !== -1) {
-                const subject = lines[dayIndex].replace(new RegExp(day, 'i'), '').trim() || lines[dayIndex + 1] || "General";
+                let subject = lines[dayIndex].replace(new RegExp(day, 'i'), '').replace(/[-—|]/g, '').trim();
+                if (isMetadata(subject)) subject = lines[dayIndex + 1] || "General";
+
                 const row2Text = lines.slice(dayIndex + 1, dayIndex + 4).join(' ');
+
                 calendarData[day] = {
                     subject,
                     content: row2Text,

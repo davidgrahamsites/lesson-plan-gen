@@ -269,9 +269,11 @@ const App: React.FC = () => {
       return;
     }
 
+    const displaySubject = dayData.subject.length > 30 ? dayData.subject.slice(0, 30) + '...' : dayData.subject;
+
     setMessages(prev => [...prev, {
       id: Date.now().toString(),
-      text: `Generating: ${files.calendar.week ? files.calendar.week + ' ' : ''}${targetDay.toUpperCase()} - ${dayData.subject}...`,
+      text: `Generating: ${files.calendar.week ? files.calendar.week + ' ' : ''}${targetDay.toUpperCase()} - ${displaySubject}...`,
       sender: 'ai',
       timestamp: new Date()
     }]);
@@ -297,12 +299,13 @@ const App: React.FC = () => {
       // We check if any CLEAN game name exists inside the messy text.
       const messyGameText = dayData.game.toLowerCase();
       const gameMatch = Object.keys(files.gamesList).find(name => {
-        // Check if the clean name (e.g. "circle the answer") is inside the messy text
+        // Check if the clean name is inside the messy text
         return messyGameText.includes(name.toLowerCase());
       });
 
-      const cleanGameName = gameMatch || dayData.game; // Use clean name if found, else messy
-      const genericDesc = gameMatch ? files.gamesList[gameMatch] : "Educational game for [topic]";
+      // EXCLUSIVE MATCH: If not found in Games List, do NOT use messy raw text.
+      const cleanGameName = gameMatch || "Learning Activity";
+      const genericDesc = gameMatch ? files.gamesList[gameMatch] : "Educational activity based on learning targets.";
 
       // 3. Get Spiral Review Sentences
       const review = GetSpiralReviewItems(files.spiralReview, spiralIndex);

@@ -117,6 +117,7 @@ export const AdvancedLessonPlanSynthesizer = async (
     STYLE RULES:
     - NO BOLDING.
     - NO FILLER (No "Discuss the weather", "Take attendance", etc.).
+    - METADATA FILTER: ABSOLUTELY IGNORE any mention of "Small Group", "Slime Mats", "Mobile Craft", "Claw Pickup", or "Horse" unless they are core vocabulary in the Mind Map.
     - Professional, clean, and literal.
 
     OUTPUT FORMAT (JSON ONLY):
