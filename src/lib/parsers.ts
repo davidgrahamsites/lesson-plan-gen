@@ -41,6 +41,11 @@ export const CalendarTableParser = (ocrText: string) => {
     const lines = ocrText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
     const calendarData: Record<string, { subject: string, content: string, game: string }> = {};
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const abbreviations: Record<string, string> = {
+        'mon': 'monday', 'tue': 'tuesday', 'wed': 'wednesday', 'thu': 'thursday', 'fri': 'friday',
+        'sat': 'saturday', 'sun': 'sunday'
+    };
+
     let extractedSong = "Song of the Week"; // Default
     let extractedWeek = ""; // Found week label (e.g. "Week 3")
 
@@ -59,10 +64,25 @@ export const CalendarTableParser = (ocrText: string) => {
         if (match) extractedWeek = match[0].toUpperCase();
     }
 
+    const findDayInLine = (line: string) => {
+        const lower = line.toLowerCase();
+        for (const day of days) {
+            if (lower.includes(day)) return day;
+        }
+        for (const [abbr, full] of Object.entries(abbreviations)) {
+            // Check for abbreviation as a word (e.g. "Mon" not "Monday")
+            const regex = new RegExp(`\\b${abbr}\\b`, 'i');
+            if (regex.test(lower)) return full;
+        }
+        return null;
+    };
+
     // Find a line that looks like a header (contains multiple day names)
     const headerLineIndex = lines.findIndex(line => {
         const lowerLine = line.toLowerCase();
-        return days.filter(d => lowerLine.includes(d)).length >= 2;
+        // Trigger if at least ONE day or abbreviation is found (good for clips)
+        return days.some(d => lowerLine.includes(d)) ||
+            Object.keys(abbreviations).some(abbr => new RegExp(`\\b${abbr}\\b`, 'i').test(lowerLine));
     });
 
     const isMetadata = (text: string) => {
@@ -79,58 +99,79 @@ export const CalendarTableParser = (ocrText: string) => {
         const contentLine = lines[headerLineIndex + 1] || "";
         const lowerHeader = headerLine.toLowerCase();
 
+        // Detect all present days in the header
+        const presentDays: Array<{ day: string, start: number }> = [];
         days.forEach(day => {
             const start = lowerHeader.indexOf(day);
-            if (start !== -1) {
-                // Find where the next day starts to segment the header and content
-                const otherDayStarts = days
-                    .map(d => lowerHeader.indexOf(d))
-                    .filter(idx => idx > start)
-                    .sort((a, b) => a - b);
-
-                const end = otherDayStarts[0] || headerLine.length;
-
-                // Segment the header (subject) and content
-                let subject = headerLine.slice(start, end).replace(new RegExp(day, 'i'), '').replace(/[-—|]/g, '').trim();
-
-                // If subject contains other days, it likely bled. Clean it GLOABLLY.
-                days.forEach(d => { if (d !== day) subject = subject.replace(new RegExp(d, 'gi'), ''); });
-
-                // Final cleanup of subject: remove excess separators and trim
-                subject = subject.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '').trim();
-
-                // Map the content line relative to the header positions
-                let content = contentLine.slice(start, end).replace(/[-—|]/g, '').trim();
-
-                if (!isMetadata(subject)) {
-                    calendarData[day] = {
-                        subject: subject || "Vocabulary",
-                        content: isMetadata(content) ? "" : content,
-                        game: isMetadata(content) ? "" : content
-                    };
+            if (start !== -1) presentDays.push({ day, start });
+        });
+        Object.entries(abbreviations).forEach(([abbr, full]) => {
+            const regex = new RegExp(`\\b${abbr}\\b`, 'gi');
+            let match;
+            while ((match = regex.exec(lowerHeader)) !== null) {
+                if (!presentDays.some(pd => pd.day === full)) {
+                    presentDays.push({ day: full, start: match.index });
                 }
+            }
+        });
+
+        presentDays.sort((a, b) => a.start - b.start).forEach((pd, index) => {
+            const start = pd.start;
+            const nextPd = presentDays[index + 1];
+            const end = nextPd ? nextPd.start : headerLine.length;
+
+            let subject = headerLine.slice(start, end).replace(/[-—|]/g, '').trim();
+            // Strip any day names from subject
+            days.forEach(d => { subject = subject.replace(new RegExp(d, 'gi'), ''); });
+            Object.keys(abbreviations).forEach(abbr => { subject = subject.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), ''); });
+            subject = subject.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '').trim();
+
+            let content = contentLine.slice(start, end).replace(/[-—|]/g, '').trim();
+
+            if (!isMetadata(subject) || !isMetadata(content)) {
+                calendarData[pd.day] = {
+                    subject: subject || "Vocabulary",
+                    content: isMetadata(content) ? "" : content,
+                    game: isMetadata(content) ? "" : content
+                };
             }
         });
     } else {
         // ROW-BASED or messy OCR
         days.forEach(day => {
-            const dayIndex = lines.findIndex(l => l.toLowerCase().includes(day));
+            let dayIndex = lines.findIndex(l => l.toLowerCase().includes(day));
+            if (dayIndex === -1) {
+                // Try abbreviation
+                const abbr = Object.keys(abbreviations).find(a => abbreviations[a] === day);
+                if (abbr) dayIndex = lines.findIndex(l => new RegExp(`\\b${abbr}\\b`, 'i').test(l));
+            }
+
             if (dayIndex !== -1) {
-                let subject = lines[dayIndex].replace(new RegExp(day, 'gi'), '').replace(/[-—|]/g, '').trim();
-                // Strip other days just in case
-                days.forEach(d => { if (d !== day) subject = subject.replace(new RegExp(d, 'gi'), ''); });
+                let subject = lines[dayIndex].replace(/[-—|]/g, '').trim();
+                days.forEach(d => { subject = subject.replace(new RegExp(d, 'gi'), ''); });
+                Object.keys(abbreviations).forEach(abbr => { subject = subject.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), ''); });
 
                 if (isMetadata(subject)) subject = lines[dayIndex + 1] || "General";
 
                 const row2Text = lines.slice(dayIndex + 1, dayIndex + 4).join(' ');
 
                 calendarData[day] = {
-                    subject,
+                    subject: subject.trim(),
                     content: row2Text,
                     game: row2Text
                 };
             }
         });
+    }
+
+    // FINAL FALLBACK: If we found NOTHING but the OCR has text, and it's a "clip",
+    // assign the whole string to 'monday' or the first day so it's not empty.
+    if (Object.keys(calendarData).length === 0 && lines.length > 0) {
+        calendarData['monday'] = {
+            subject: "Pasted Content",
+            content: ocrText,
+            game: ocrText
+        };
     }
 
     return { data: calendarData, song: extractedSong, week: extractedWeek };
