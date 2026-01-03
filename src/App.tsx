@@ -299,13 +299,12 @@ const App: React.FC = () => {
       // We check if any CLEAN game name exists inside the messy text.
       const messyGameText = dayData.game.toLowerCase();
       const gameMatch = Object.keys(files.gamesList).find(name => {
-        // Check if the clean name is inside the messy text
         return messyGameText.includes(name.toLowerCase());
       });
 
-      // EXCLUSIVE MATCH: If not found in Games List, do NOT use messy raw text.
-      const cleanGameName = gameMatch || "Learning Activity";
-      const genericDesc = gameMatch ? files.gamesList[gameMatch] : "Educational activity based on learning targets.";
+      // LOOSER MATCH: Try to use clean name, but if not found, use cleaned OCR text.
+      const cleanGameName = gameMatch || dayData.game.replace(/practice\s*week\s*\d*/gi, '').replace(/small\s*group/gi, '').trim();
+      const genericDesc = gameMatch ? files.gamesList[gameMatch] : "Educational game based on curriculum targets.";
 
       // 3. Get Spiral Review Sentences
       const review = GetSpiralReviewItems(files.spiralReview, spiralIndex);

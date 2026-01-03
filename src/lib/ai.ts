@@ -91,16 +91,16 @@ export const AdvancedLessonPlanSynthesizer = async (
     Class: ${context.className}
 
     STRUCTURE & CONTENT RULES:
-    1. OBJECTIVES: 
-       - Form 2-3 specific bullet points using the literal Learning Targets.
-       - DO NOT summarize or simplify (e.g., if targets say "Feelings, Family, Home", don't just say "Vocabulary").
+    1. OBJECTIVES & CATEGORIES: 
+       - USE LITERAL HEADERS from the Learning Targets. If targets say "Fall Unit:", YOUR section MUST say "Fall Unit".
+       - DO NOT rename categories (e.g. don't change "Fall Unit" to "Plants").
+       - Form specific bullet points using the literal Learning Targets.
     
     2. MATERIALS:
-       - DYNAMIC EXTRACTION: Infer the materials from the Learning Targets.
-       - If targets list vocabulary (e.g. "bee, ant, leaf"), list them as "Vocabulary cards: [words]".
-       - Categorize them (e.g. "Feelings cards:", "Family cards:").
-       - Include specific items mention in the Game.
-    
+       - LIST MATERIALS based on the LITERAL category names.
+       - If targets list vocabulary (e.g. "bee, ant, leaf" under "Fall Unit"), list them as "Fall Unit cards: [words]".
+       - DO NOT INFER CATEGORIES. Use what is written in the Mind Map.
+
     3. PROCESS (WITH TIMINGS):
        - Introduction (5 minutes):
          * Sing ${context.song}.

@@ -93,15 +93,18 @@ export const CalendarTableParser = (ocrText: string) => {
                 // Segment the header (subject) and content
                 let subject = headerLine.slice(start, end).replace(new RegExp(day, 'i'), '').replace(/[-—|]/g, '').trim();
 
-                // If subject contains other days, it likely bled. Clean it.
-                days.forEach(d => { if (d !== day) subject = subject.replace(new RegExp(d, 'i'), ''); });
+                // If subject contains other days, it likely bled. Clean it GLOABLLY.
+                days.forEach(d => { if (d !== day) subject = subject.replace(new RegExp(d, 'gi'), ''); });
+
+                // Final cleanup of subject: remove excess separators and trim
+                subject = subject.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, '').trim();
 
                 // Map the content line relative to the header positions
                 let content = contentLine.slice(start, end).replace(/[-—|]/g, '').trim();
 
                 if (!isMetadata(subject)) {
                     calendarData[day] = {
-                        subject: subject || "No Subject",
+                        subject: subject || "Vocabulary",
                         content: isMetadata(content) ? "" : content,
                         game: isMetadata(content) ? "" : content
                     };
@@ -113,7 +116,10 @@ export const CalendarTableParser = (ocrText: string) => {
         days.forEach(day => {
             const dayIndex = lines.findIndex(l => l.toLowerCase().includes(day));
             if (dayIndex !== -1) {
-                let subject = lines[dayIndex].replace(new RegExp(day, 'i'), '').replace(/[-—|]/g, '').trim();
+                let subject = lines[dayIndex].replace(new RegExp(day, 'gi'), '').replace(/[-—|]/g, '').trim();
+                // Strip other days just in case
+                days.forEach(d => { if (d !== day) subject = subject.replace(new RegExp(d, 'gi'), ''); });
+
                 if (isMetadata(subject)) subject = lines[dayIndex + 1] || "General";
 
                 const row2Text = lines.slice(dayIndex + 1, dayIndex + 4).join(' ');
